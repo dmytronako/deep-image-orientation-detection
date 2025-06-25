@@ -11,7 +11,7 @@ CACHE_DIR = "data/cache"
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"
 IMAGE_SIZE = 224
-BATCH_SIZE = 128
+BATCH_SIZE = 512
 # Set num_workers to 0 if you are on Windows, otherwise > 0
 NUM_WORKERS = 16 # Or 12. Experiment with this value.
 

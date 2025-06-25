@@ -6,25 +6,14 @@ import numpy as np
 from torch.utils.data import Dataset
 from PIL import Image
 
-import albumentations as A
-from albumentations.pytorch import ToTensorV2
-
+import torchvision.transforms as transforms
 import config
+from src.utils import load_image_safely # Use the robust loader
 
-def load_image_for_albumentations(path: str) -> np.ndarray:
-    # This function is fine as it is.
-    img = Image.open(path)
-    if img.mode in ('RGB', 'L'):
-        return np.array(img.convert('RGB'))
-    if img.mode != 'RGBA':
-        img = img.convert('RGBA')
-    background = Image.new("RGB", img.size, (255, 255, 255))
-    background.paste(img, mask=img)
-    return np.array(background)
-
-
+# This is the original, on-the-fly dataset. We'll keep it for comparison
+# or for cases where caching is not desired.
 class ImageOrientationDataset(Dataset):
-    def __init__(self, upright_dir):
+    def __init__(self, upright_dir, transform=None):
         self.upright_dir = upright_dir
         self.image_files = []
         for root, _, files in os.walk(upright_dir):
@@ -35,41 +24,87 @@ class ImageOrientationDataset(Dataset):
         if not self.image_files:
             raise ValueError(f"No images found in the directory: {upright_dir}")
 
-        # 1. Define the rotations and create a list of transform pipelines, one for each rotation.
-        self.rotations = [0, -90, -180, -270] # Corresponds to labels 0, 1, 2, 3
+        self.transform = transform
+        self.rotations = [0, 90, 180, 270] # PIL rotation degrees
         self.num_rotations = len(self.rotations)
-        
-        self.transforms = []
-        for angle in self.rotations:
-            # Create a full pipeline for this specific angle
-            pipeline = A.Compose([
-                A.Rotate(limit=(angle, angle), p=1.0, interpolation=Image.BILINEAR, border_mode=0),
-                A.Resize(height=config.IMAGE_SIZE, width=config.IMAGE_SIZE),
-                A.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-                ToTensorV2(),
-            ])
-            self.transforms.append(pipeline)
 
     def __len__(self):
         return len(self.image_files) * self.num_rotations
 
     def __getitem__(self, idx):
         image_idx = idx // self.num_rotations
-        rotation_idx = idx % self.num_rotations # This will be 0, 1, 2, or 3
-
+        rotation_idx = idx % self.num_rotations
+        
         image_path = self.image_files[image_idx]
+        angle_to_rotate = self.rotations[rotation_idx]
         label = rotation_idx
 
         try:
-            image = load_image_for_albumentations(image_path)
+            # Use the safe loader from utils
+            image = load_image_safely(image_path)
+            # Apply the selected rotation
+            rotated_image = image.rotate(angle_to_rotate, resample=Image.BICUBIC, expand=True)
+            
+            if self.transform:
+                image_tensor = self.transform(rotated_image)
+            else:
+                # Default minimal transformation if none provided
+                image_tensor = transforms.ToTensor()(rotated_image)
+
         except Exception as e:
-            logging.warning(f"Warning: Could not open {image_path}. Skipping. Error: {e}")
+            logging.warning(f"Warning: Could not open or process {image_path}. Skipping. Error: {e}")
+            # Return a random sample to avoid crashing the loader
             return self.__getitem__(random.randint(0, len(self) - 1))
 
-        # 2. Select the PRE-COMPILED transform from the list. This is extremely fast.
-        transform = self.transforms[rotation_idx]
+        return image_tensor, torch.tensor(label, dtype=torch.long)
 
-        transformed = transform(image=image)
-        image_tensor = transformed['image']
 
+# This dataset reads directly from the pre-processed and cached images.
+# It is significantly faster as it only has to do a file read and basic tensor conversion.
+class ImageOrientationDatasetFromCache(Dataset):
+    def __init__(self, cache_dir, transform=None):
+        self.cache_dir = cache_dir
+        self.transform = transform
+        
+        if not os.path.exists(cache_dir) or not os.listdir(cache_dir):
+            raise FileNotFoundError(
+                f"Cache directory is empty or does not exist: '{cache_dir}'. "
+                "Run the caching process in `train.py` first."
+            )
+            
+        self.image_files = [os.path.join(cache_dir, f) for f in os.listdir(cache_dir) if f.endswith('.png')]
+        
+        if not self.image_files:
+            raise ValueError(f"No .png images found in the cache directory: {cache_dir}")
+
+    def __len__(self):
+        return len(self.image_files)
+
+    def __getitem__(self, idx):
+        image_path = self.image_files[idx]
+        
+        try:
+            # The label is encoded in the filename (e.g., "my_image__2.png" -> label 2).
+            # This logic robustly finds the last "__" and parses the number after it,
+            # correctly handling filenames that might contain underscores.
+            filename_no_ext = os.path.splitext(os.path.basename(image_path))[0]
+            last_sep_idx = filename_no_ext.rfind('__')
+            if last_sep_idx == -1:
+                raise ValueError(f"Filename '{image_path}' does not contain the '__' separator.")
+            
+            label_str = filename_no_ext[last_sep_idx + 2:]
+            label = int(label_str)
+
+            # Load the already-rotated image
+            image = load_image_safely(image_path)
+
+            if self.transform:
+                image_tensor = self.transform(image)
+            else:
+                image_tensor = transforms.ToTensor()(image)
+
+        except Exception as e:
+            logging.warning(f"Could not read or process cached file {image_path}. Error: {e}")
+            return self.__getitem__(random.randint(0, len(self) - 1))
+            
         return image_tensor, torch.tensor(label, dtype=torch.long)

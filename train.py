@@ -8,53 +8,78 @@ import os
 import argparse
 import logging
 import shutil
-import time ### <<< IMPORT TIME FOR TIMERS
+import time
 
 import config
-from src.dataset import ImageOrientationDataset
+from src.caching import cache_dataset
+from src.dataset import ImageOrientationDataset, ImageOrientationDatasetFromCache
 from src.model import get_orientation_model
-from src.utils import get_device, setup_logging
+from src.utils import get_device, setup_logging, get_data_transforms
 
 def train(args):
     """Main training routine."""
     setup_logging()
-    training_start_time = time.time() ### <<< START OVERALL TIMER
+    training_start_time = time.time()
 
-    ### <<< START: CONFIGURATION LOGGING BLOCK
     logging.info("=================================================")
     logging.info("      STARTING MODEL TRAINING SCRIPT")
     logging.info("=================================================")
     logging.info("Configuration:")
-    logging.info(f"  - Data Directory: {args.data_dir}")
+    logging.info(f"  - Using Cache: {config.USE_CACHE}")
+    if config.USE_CACHE:
+        logging.info(f"  - Cache Directory: {config.CACHE_DIR}")
+        logging.info(f"  - Force Rebuild Cache: {args.force_rebuild_cache}")
+    logging.info(f"  - Source Data Directory: {args.data_dir}")
     logging.info(f"  - Model Save Directory: {args.model_dir}")
     logging.info(f"  - Number of Epochs: {args.epochs}")
     logging.info(f"  - Batch Size: {args.batch_size}")
     logging.info(f"  - Learning Rate: {args.lr}")
-    logging.info(f"  - Dataloader Workers: {args.workers}") # Use the new arg
-    ### <<< END: CONFIGURATION LOGGING BLOCK
-
+    logging.info(f"  - Dataloader Workers: {args.workers}")
+    
     # Ensure model save directory exists
     os.makedirs(args.model_dir, exist_ok=True)
 
     device = get_device()
+    transforms = get_data_transforms()
 
     # --- Dataset and Dataloaders ---
-    logging.info("\n--- Initializing Dataset and Dataloaders ---") ### <<< SECTION HEADER
+    logging.info("\n--- Initializing Dataset and Dataloaders ---")
+
     try:
-        full_dataset = ImageOrientationDataset(upright_dir=args.data_dir)
-    except ValueError as e:
-        logging.error(e)
+        if config.USE_CACHE:
+            # 1. Trigger the caching process
+            cache_dataset(force_rebuild=args.force_rebuild_cache)
+            # 2. Use the dataset that reads from the cache
+            full_dataset = ImageOrientationDatasetFromCache(
+                cache_dir=config.CACHE_DIR,
+                transform=transforms
+            )
+            logging.info(f"Successfully loaded dataset from CACHE ({len(full_dataset)} images).")
+        else:
+            # Use the original on-the-fly dataset
+            logging.info("Using ON-THE-FLY image processing (caching is disabled).")
+            full_dataset = ImageOrientationDataset(
+                upright_dir=args.data_dir,
+                transform=transforms
+            )
+            logging.info(f"Successfully loaded dataset for on-the-fly processing.")
+
+    except (ValueError, FileNotFoundError) as e:
+        logging.error(f"Failed to initialize dataset: {e}")
         return
 
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
     train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
 
-    logging.info(f"Dataset found {len(full_dataset.image_files)} original image files.")
-    logging.info(f"Total dataset size (with 4 rotations): {len(full_dataset)}")
+    if config.USE_CACHE:
+        logging.info(f"Total cached dataset size: {len(full_dataset)}")
+    else:
+        logging.info(f"Dataset found {len(full_dataset.image_files)} original image files.")
+        logging.info(f"Total dataset size (with 4 rotations): {len(full_dataset)}")
+    
     logging.info(f"Splitting into Training: {len(train_dataset)} samples, Validation: {len(val_dataset)} samples.")
-
-    # Use args.workers for num_workers
+    
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
     logging.info("Dataloaders created successfully.")
@@ -161,6 +186,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=config.LEARNING_RATE, help='Learning rate.')
     ### <<< ADDED: Argument for number of workers
     parser.add_argument('--workers', type=int, default=config.NUM_WORKERS, help='Number of data loading workers.')
+    parser.add_argument('--force-rebuild-cache', action='store_true', help='If set, clears and rebuilds the image cache.')
     
     args = parser.parse_args()
     train(args)

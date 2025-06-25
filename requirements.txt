@@ -4,3 +4,4 @@ pillow
 numpy
 albumentations
 opencv-python-headless
+tqdm
