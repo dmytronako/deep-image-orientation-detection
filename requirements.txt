@@ -1,0 +1,6 @@
+torch
+torchvision
+pillow
+numpy
+albumentations
+opencv-python-headless

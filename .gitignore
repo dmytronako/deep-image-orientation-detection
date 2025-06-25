@@ -192,3 +192,15 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+
+# Environment
+venv/
+.env
+
+# Data & Models (often large and shouldn't be in git)
+data/
+models/
+
+# IDE specific
+.vscode/
+.idea/
