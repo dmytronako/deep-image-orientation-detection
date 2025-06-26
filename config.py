@@ -11,17 +11,16 @@ CACHE_DIR = "data/cache"
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"
 IMAGE_SIZE = 224
-BATCH_SIZE = 512
-# Set num_workers to 0 if you are on Windows, otherwise > 0
-NUM_WORKERS = 16 # Or 12. Experiment with this value.
+BATCH_SIZE = 256
+NUM_WORKERS = 4 # Or More, depending on your CPU cores
 
 # --- Model Configuration ---
 MODEL_SAVE_DIR = "models"
-MODEL_NAME = "orientation_model_v8" # Incremented version
+MODEL_NAME = "orientation_model_v11"
 NUM_CLASSES = 4  # 0°, 90°, 180°, 270°
 
 # --- Training Hyperparameters ---
-LEARNING_RATE = 0.001
+LEARNING_RATE = 0.0001
 NUM_EPOCHS = 25
 
 # --- Prediction Settings ---

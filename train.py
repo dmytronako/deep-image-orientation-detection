@@ -15,6 +15,7 @@ from src.caching import cache_dataset
 from src.dataset import ImageOrientationDataset, ImageOrientationDatasetFromCache
 from src.model import get_orientation_model
 from src.utils import get_device, setup_logging, get_data_transforms
+import torch.optim.lr_scheduler as lr_scheduler
 
 def train(args):
     """Main training routine."""
@@ -43,24 +44,25 @@ def train(args):
     transforms = get_data_transforms()
 
     # --- Dataset and Dataloaders ---
-    logging.info("\n--- Initializing Dataset and Dataloaders ---")
+    logging.info("\n--- Initializing Dataset and Dataloaders ---") 
+    data_transforms = get_data_transforms()
 
     try:
         if config.USE_CACHE:
             # 1. Trigger the caching process
             cache_dataset(force_rebuild=args.force_rebuild_cache)
-            # 2. Use the dataset that reads from the cache
+            # 2. Use the dataset that reads from the cache, but WITHOUT a transform initially
             full_dataset = ImageOrientationDatasetFromCache(
                 cache_dir=config.CACHE_DIR,
-                transform=transforms
+                transform=None  # IMPORTANT: Apply transform only after splitting
             )
             logging.info(f"Successfully loaded dataset from CACHE ({len(full_dataset)} images).")
         else:
-            # Use the original on-the-fly dataset
+            
             logging.info("Using ON-THE-FLY image processing (caching is disabled).")
             full_dataset = ImageOrientationDataset(
                 upright_dir=args.data_dir,
-                transform=transforms
+                transform=None # IMPORTANT: Apply transform after splitting
             )
             logging.info(f"Successfully loaded dataset for on-the-fly processing.")
 
@@ -68,9 +70,13 @@ def train(args):
         logging.error(f"Failed to initialize dataset: {e}")
         return
 
+    # Split the dataset
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
-    train_dataset, val_dataset = random_split(full_dataset, [train_size, val_size])
+    train_subset, val_subset = random_split(full_dataset, [train_size, val_size])
+
+    train_subset.dataset.transform = data_transforms['train']
+    val_subset.dataset.transform = data_transforms['val']
 
     if config.USE_CACHE:
         logging.info(f"Total cached dataset size: {len(full_dataset)}")
@@ -78,22 +84,28 @@ def train(args):
         logging.info(f"Dataset found {len(full_dataset.image_files)} original image files.")
         logging.info(f"Total dataset size (with 4 rotations): {len(full_dataset)}")
     
-    logging.info(f"Splitting into Training: {len(train_dataset)} samples, Validation: {len(val_dataset)} samples.")
+    logging.info(f"Splitting into Training: {len(train_subset)} samples, Validation: {len(val_subset)} samples.")
     
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
+    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=False)
+    val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=False)
     logging.info("Dataloaders created successfully.")
 
     # --- Model, Loss, Optimizer ---
     logging.info("\n--- Setting up Model ---") ### <<< SECTION HEADER
     model = get_orientation_model().to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.fc.parameters(), lr=args.lr)
-    logging.info(f"Using pre-trained ResNet18 model. Final layer is trainable.")
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
+    logging.info(f"Using pre-trained ResNet18 model. Final layers is trainable.")
 
+    # Add scheduler (why?)
+    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.2, patience=3)
     # --- Training Loop ---
     best_val_acc = 0.0
     best_model_path = ""
+
+    # Add these two lines for early stopping
+    epochs_no_improve = 0
+    early_stop_patience = 7 # Stop after 7 epochs of no improvement
 
     logging.info("\n--- Starting Training Loop ---") ### <<< SECTION HEADER
     for epoch in range(args.epochs):
@@ -113,8 +125,8 @@ def train(args):
             running_loss += loss.item() * inputs.size(0)
             running_corrects += torch.sum(preds == labels.data)
 
-        epoch_loss = running_loss / len(train_dataset)
-        epoch_acc = running_corrects.float() / len(train_dataset)
+        epoch_loss = running_loss / len(train_subset)
+        epoch_acc = running_corrects.float() / len(train_subset)
 
         # --- Validation Phase ---
         model.eval()
@@ -128,12 +140,14 @@ def train(args):
                 val_loss += loss.item() * inputs.size(0)
                 val_corrects += torch.sum(preds == labels.data)
 
-        val_epoch_loss = val_loss / len(val_dataset)
-        val_epoch_acc = val_corrects.float() / len(val_dataset)
-        
-        epoch_duration = time.time() - epoch_start_time ### <<< CALCULATE EPOCH DURATION
+        val_epoch_loss = val_loss / len(val_subset)
+        val_epoch_acc = val_corrects.float() / len(val_subset)
 
-        ### <<< MODIFIED: Added epoch duration to the log line
+        scheduler.step(val_epoch_acc)
+        
+        epoch_duration = time.time() - epoch_start_time ### EPOCH DURATION
+
+        ### Added epoch duration to the log line
         logging.info(
             f"Epoch {epoch+1:02d}/{args.epochs} | "
             f"Train Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | "
@@ -157,7 +171,18 @@ def train(args):
             shutil.copy(unique_save_path, static_save_path)
             best_model_path = unique_save_path
 
-            logging.info(f"  -> 🎉 New best model saved! Val Acc: {best_val_acc:.4f}")
+            # Reset the counter when we find a new best model
+            epochs_no_improve = 0
+            logging.info(f"  -> 🎉 New best model saved! Val Acc: {best_val_acc:.4f}")            
+        else:
+            # Increment the counter if no improvement
+            epochs_no_improve += 1
+
+        # --- Check for early stopping ---
+        if epochs_no_improve >= early_stop_patience:
+            logging.info(f"\n--- Early stopping triggered after {early_stop_patience} epochs with no improvement. ---")
+            logging.info(f"Best validation accuracy was {best_val_acc:.4f} at epoch {epoch - early_stop_patience + 1}.")
+            break # Exit the training loop
 
 
     ### <<< START: FINAL SUMMARY BLOCK
@@ -178,13 +203,13 @@ def train(args):
 
 
 if __name__ == '__main__':
+
     parser = argparse.ArgumentParser(description="Train an image orientation detection model.")
     parser.add_argument('--data_dir', type=str, default=config.DATA_DIR, help='Directory with upright images.')
     parser.add_argument('--model_dir', type=str, default=config.MODEL_SAVE_DIR, help='Directory to save trained models.')
     parser.add_argument('--epochs', type=int, default=config.NUM_EPOCHS, help='Number of training epochs.')
     parser.add_argument('--batch_size', type=int, default=config.BATCH_SIZE, help='Training batch size.')
     parser.add_argument('--lr', type=float, default=config.LEARNING_RATE, help='Learning rate.')
-    ### <<< ADDED: Argument for number of workers
     parser.add_argument('--workers', type=int, default=config.NUM_WORKERS, help='Number of data loading workers.')
     parser.add_argument('--force-rebuild-cache', action='store_true', help='If set, clears and rebuilds the image cache.')
     

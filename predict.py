@@ -43,7 +43,8 @@ def run_prediction(args):
         return
 
     device = get_device()
-    transforms = get_data_transforms()
+    all_transforms = get_data_transforms()
+    transforms = all_transforms['val']
 
     # Load the trained model
     model = get_orientation_model(pretrained=False) # No need to download weights

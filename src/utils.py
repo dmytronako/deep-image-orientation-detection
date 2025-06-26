@@ -30,17 +30,33 @@ def get_device() -> torch.device:
         logging.info("CUDA and MPS not available. Using CPU.")
     return device
 
-def get_data_transforms() -> transforms.Compose:
+def get_data_transforms() -> dict:
     """
-    Returns the standard data transformations for the model.
+    Returns a dictionary of data transformations for training and validation.
     """
-    return transforms.Compose([
-        transforms.Resize((IMAGE_SIZE + 32, IMAGE_SIZE + 32)), # Resize to a bit larger
-        transforms.CenterCrop(IMAGE_SIZE),
-        transforms.ToTensor(),
-        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-    ])
-
+    return {
+        'train': transforms.Compose([
+            # Increase the range of cropping
+            transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.7, 1.0)), 
+            transforms.RandomHorizontalFlip(),
+            # Increase the intensity of color jitter
+            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
+            # Increase the rotation slightly
+            transforms.RandomRotation(15), 
+            # New augmentation: Random Erasing
+            transforms.ToTensor(), # ToTensor must come before Normalize and Erasing
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+            # Randomly erase a patch of the image, forcing the model to look at context
+            transforms.RandomErasing(p=0.5, scale=(0.02, 0.2)),
+        ]),
+        'val': transforms.Compose([
+            # The validation transform remains deterministic.
+            transforms.Resize((IMAGE_SIZE + 32, IMAGE_SIZE + 32)),
+            transforms.CenterCrop(IMAGE_SIZE),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+        ]),
+    }
 
 def load_image_safely(path: str) -> Image.Image:
     """
