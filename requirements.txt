@@ -5,3 +5,4 @@ numpy
 albumentations
 opencv-python-headless
 tqdm
+tensorboard

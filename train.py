@@ -16,6 +16,7 @@ from src.dataset import ImageOrientationDataset, ImageOrientationDatasetFromCach
 from src.model import get_orientation_model
 from src.utils import get_device, setup_logging, get_data_transforms
 import torch.optim.lr_scheduler as lr_scheduler
+from torch.utils.tensorboard import SummaryWriter
 
 def train(args):
     """Main training routine."""
@@ -37,11 +38,12 @@ def train(args):
     logging.info(f"  - Learning Rate: {args.lr}")
     logging.info(f"  - Dataloader Workers: {args.workers}")
     
+    writer = SummaryWriter(f"runs/{config.MODEL_NAME}")
+
     # Ensure model save directory exists
     os.makedirs(args.model_dir, exist_ok=True)
 
     device = get_device()
-    transforms = get_data_transforms()
 
     # --- Dataset and Dataloaders ---
     logging.info("\n--- Initializing Dataset and Dataloaders ---") 
@@ -86,12 +88,12 @@ def train(args):
     
     logging.info(f"Splitting into Training: {len(train_subset)} samples, Validation: {len(val_subset)} samples.")
     
-    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=False)
-    val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=False)
+    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
+    val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
     logging.info("Dataloaders created successfully.")
 
     # --- Model, Loss, Optimizer ---
-    logging.info("\n--- Setting up Model ---") ### <<< SECTION HEADER
+    logging.info("\n--- Setting up Model ---")
     model = get_orientation_model().to(device)
     criterion = nn.CrossEntropyLoss()
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
@@ -107,9 +109,9 @@ def train(args):
     epochs_no_improve = 0
     early_stop_patience = 7 # Stop after 7 epochs of no improvement
 
-    logging.info("\n--- Starting Training Loop ---") ### <<< SECTION HEADER
+    logging.info("\n--- Starting Training Loop ---")
     for epoch in range(args.epochs):
-        epoch_start_time = time.time() ### <<< START EPOCH TIMER
+        epoch_start_time = time.time()
 
         # --- Training Phase ---
         model.train()
@@ -155,6 +157,15 @@ def train(args):
             f"Duration: {epoch_duration:.2f}s"
         )
 
+        # --- TensorBoard Logging ---
+        writer.add_scalar('Loss/train', epoch_loss, epoch)
+        writer.add_scalar('Accuracy/train', epoch_acc, epoch)
+        writer.add_scalar('Loss/validation', val_epoch_loss, epoch)
+        writer.add_scalar('Accuracy/validation', val_epoch_acc, epoch)
+        # Log the learning rate to see the scheduler work
+        writer.add_scalar('Hyperparameters/learning_rate', optimizer.param_groups[0]['lr'], epoch)
+        # -------------------------------------------------
+
         # --- MODEL SAVING LOGIC ---
         current_acc = val_epoch_acc.item()
         if current_acc > best_val_acc:
@@ -185,7 +196,7 @@ def train(args):
             break # Exit the training loop
 
 
-    ### <<< START: FINAL SUMMARY BLOCK
+    ### FINAL SUMMARY BLOCK
     total_duration = time.time() - training_start_time
     total_minutes = total_duration / 60
     logging.info("\n=================================================")
@@ -199,7 +210,8 @@ def train(args):
     else:
         logging.warning("No model was saved as validation accuracy did not improve from its initial state.")
     logging.info("=================================================")
-    ### <<< END: FINAL SUMMARY BLOCK
+    
+    writer.close()  # Close the TensorBoard writer
 
 
 if __name__ == '__main__':
