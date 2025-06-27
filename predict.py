@@ -72,7 +72,7 @@ def run_prediction(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Predict image orientation.")
     parser.add_argument('--input_path', type=str, required=True, help='Path to an image file or a directory of images.')
-    parser.add_argument('--model_path', type=str, default=os.path.join(config.MODEL_SAVE_DIR, "orientation_model_v5_epoch_1_vacc_0.6462.pth"), help='Path to the trained model file.')
+    parser.add_argument('--model_path', type=str, default=os.path.join(config.MODEL_SAVE_DIR, "best_model.pth"), help='Path to the trained model file.')
     
     args = parser.parse_args()
     run_prediction(args)
