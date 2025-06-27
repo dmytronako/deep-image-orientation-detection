@@ -197,12 +197,13 @@ cython_debug/
 venv/
 .env
 
-# Data & Models (often large and shouldn't be in git)
-data/
-models/
-
 # IDE specific
 .vscode/
 .idea/
 
+# Data & Models (often large and shouldn't be in git)
+data/
+models/*
 !models/best_model_v1.pth
+
+runs/
