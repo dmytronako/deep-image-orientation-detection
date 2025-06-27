@@ -6,19 +6,19 @@ from config import NUM_CLASSES
 
 def get_orientation_model(pretrained=True):
     """
-    Loads a pre-trained ResNet18 model and replaces its final
+    Loads a pre-trained ResNet50 model and replaces its final
     layer for our 4-class orientation task.
     """
-    weights = models.ResNet18_Weights.IMAGENET1K_V1 if pretrained else None
-    model = models.resnet18(weights=weights)
-    
+    weights = models.ResNet50_Weights.IMAGENET1K_V1 if pretrained else None
+    model = models.resnet50(weights=weights)
+
     # Freeze all parameters in the model
     for param in model.parameters():
         param.requires_grad = False
 
     # Use fine-tuning
-    for param in model.layer3.parameters():
-        param.requires_grad = True
+    #for param in model.layer3.parameters():
+        #param.requires_grad = True
     for param in model.layer4.parameters():
         param.requires_grad = True
         

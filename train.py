@@ -17,6 +17,8 @@ from src.model import get_orientation_model
 from src.utils import get_device, setup_logging, get_data_transforms
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
+import torchvision
+from torchvision.utils import draw_bounding_boxes
 
 def train(args):
     """Main training routine."""
@@ -44,6 +46,14 @@ def train(args):
     os.makedirs(args.model_dir, exist_ok=True)
 
     device = get_device()
+    
+    # Determine if pin_memory should be used
+    pin_memory_enabled = device.type == 'cuda'
+    if pin_memory_enabled:
+        logging.info("CUDA detected, pin_memory will be enabled for DataLoaders.")
+    else:
+        logging.info("CUDA not detected, pin_memory will be disabled.")
+
 
     # --- Dataset and Dataloaders ---
     logging.info("\n--- Initializing Dataset and Dataloaders ---") 
@@ -88,16 +98,17 @@ def train(args):
     
     logging.info(f"Splitting into Training: {len(train_subset)} samples, Validation: {len(val_subset)} samples.")
     
-    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=True)
-    val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=True)
+    train_loader = DataLoader(train_subset, batch_size=args.batch_size, shuffle=True, num_workers=args.workers, pin_memory=pin_memory_enabled)
+    val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=pin_memory_enabled)
     logging.info("Dataloaders created successfully.")
 
     # --- Model, Loss, Optimizer ---
     logging.info("\n--- Setting up Model ---")
     model = get_orientation_model().to(device)
     criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
-    logging.info(f"Using pre-trained ResNet18 model. Final layers is trainable.")
+    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    logging.info(f"Using pre-trained {config.MODEL_NAME} model. Final layers is trainable.")
+    logging.info(f"Optimizer configured with Adam, LR={args.lr}") 
 
     # Add scheduler (why?)
     scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.2, patience=3)
@@ -133,6 +144,11 @@ def train(args):
         # --- Validation Phase ---
         model.eval()
         val_loss, val_corrects = 0.0, 0
+        
+        # Flag to log images only once per epoch
+        logged_images = False
+        log_images_into_tensorboard = False
+        
         with torch.no_grad():
             for inputs, labels in val_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
@@ -142,6 +158,66 @@ def train(args):
                 val_loss += loss.item() * inputs.size(0)
                 val_corrects += torch.sum(preds == labels.data)
 
+                if log_images_into_tensorboard:
+                    if not logged_images:
+                        # Map rotation index to degrees for clarity
+                        rotation_map = {0: "0°", 1: "270°", 2: "180°", 3: "90°"}
+                        
+                        # We need to un-normalize the images to see them correctly
+                        img_tensor_to_show = inputs.clone().cpu()
+                        mean = torch.tensor([0.485, 0.456, 0.406]).view(3, 1, 1)
+                        std = torch.tensor([0.229, 0.224, 0.225]).view(3, 1, 1)
+                        img_tensor_to_show = img_tensor_to_show * std + mean
+                        img_tensor_to_show = torch.clamp(img_tensor_to_show, 0, 1)
+
+                        # Convert to format needed for drawing (uint8)
+                        imgs_to_draw_uint8 = (img_tensor_to_show * 255).to(torch.uint8)
+                        
+                        # --- THIS IS THE KEY CHANGE: LOOP THROUGH THE BATCH ---
+                        labeled_images = []
+                        incorrect_labeled_images = []
+                        for i in range(imgs_to_draw_uint8.size(0)):
+                            # Get the i-th image, prediction, and label
+                            img = imgs_to_draw_uint8[i]
+                            pred_idx = preds[i].item()
+                            label_idx = labels[i].item()
+                            
+                            is_correct = pred_idx == label_idx
+
+                            # Create the text label for this single image
+                            label_text = f"Pred: {rotation_map[pred_idx]}, GT: {rotation_map[label_idx]}"
+                            
+                            # Use a dummy bounding box for this single image
+                            dummy_box = torch.zeros(1, 4, dtype=torch.int)
+                            dummy_box[:, 2] = 5
+                            dummy_box[:, 3] = 5
+                            
+                            # Draw the label on the single image
+                            labeled_img = draw_bounding_boxes(
+                                image=img, 
+                                boxes=dummy_box, 
+                                labels=[label_text], # Pass label as a list
+                                colors="green" if is_correct else "red", 
+                                width=1, 
+                                font="C:/Windows/Fonts/arial.ttf",
+                                font_size=15
+                            )
+                            labeled_images.append(labeled_img)
+
+                            if not is_correct:
+                                incorrect_labeled_images.append(labeled_img)
+                        # ----------------------------------------------------
+
+                        # Create a grid from the list of now-labeled images
+                        grid = torchvision.utils.make_grid(labeled_images)
+                        writer.add_image('validation_images', grid, global_step=epoch)
+
+                        if incorrect_labeled_images:
+                            incorrect_grid = torchvision.utils.make_grid(incorrect_labeled_images)
+                            writer.add_image('incorrect_predictions', incorrect_grid, global_step=epoch)
+                        
+                        logged_images = True # Set flag to true so we don't log again this epoch
+                    
         val_epoch_loss = val_loss / len(val_subset)
         val_epoch_acc = val_corrects.float() / len(val_subset)
 

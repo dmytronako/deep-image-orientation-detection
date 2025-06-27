@@ -204,3 +204,5 @@ models/
 # IDE specific
 .vscode/
 .idea/
+
+!models/best_model_v1.pth
