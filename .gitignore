@@ -204,6 +204,6 @@ venv/
 # Data & Models (often large and shouldn't be in git)
 data/
 models/*
-!models/best_model_v1.pth
+!models/best_model_v1_0_9523.pth
 
 runs/
