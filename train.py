@@ -105,13 +105,13 @@ def train(args):
     # --- Model, Loss, Optimizer ---
     logging.info("\n--- Setting up Model ---")
     model = get_orientation_model().to(device)
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1) # Add label_smoothing
+    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-3) # Use AdamW and weight_decay
     logging.info(f"Using pre-trained {config.MODEL_NAME} model. Final layers is trainable.")
-    logging.info(f"Optimizer configured with Adam, LR={args.lr}") 
+    logging.info(f"Optimizer configured with AdamW, LR={args.lr}")
 
-    # Add scheduler (why?)
-    scheduler = lr_scheduler.ReduceLROnPlateau(optimizer, mode='max', factor=0.2, patience=3)
+    # Add scheduler
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
     # --- Training Loop ---
     best_val_acc = 0.0
     best_model_path = ""
@@ -221,7 +221,7 @@ def train(args):
         val_epoch_loss = val_loss / len(val_subset)
         val_epoch_acc = val_corrects.float() / len(val_subset)
 
-        scheduler.step(val_epoch_acc)
+        scheduler.step()
         
         epoch_duration = time.time() - epoch_start_time ### EPOCH DURATION
 

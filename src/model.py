@@ -17,8 +17,8 @@ def get_orientation_model(pretrained=True):
         param.requires_grad = False
 
     # Use fine-tuning
-    #for param in model.layer3.parameters():
-        #param.requires_grad = True
+    for param in model.layer3.parameters():
+        param.requires_grad = True
     for param in model.layer4.parameters():
         param.requires_grad = True
         
