@@ -10,17 +10,17 @@ CACHE_DIR = "data/cache"
 
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"
-IMAGE_SIZE = 224
-BATCH_SIZE = 256
+IMAGE_SIZE = 480
+BATCH_SIZE = 128
 NUM_WORKERS = 4 # Or More, depending on your CPU cores
 
 # --- Model Configuration ---
 MODEL_SAVE_DIR = "models"
-MODEL_NAME = "orientation_model_v11"
+MODEL_NAME = "orientation_model_v11_tensor_efficientnet_v2_m"
 NUM_CLASSES = 4  # 0°, 90°, 180°, 270°
 
 # --- Training Hyperparameters ---
-LEARNING_RATE = 0.0001
+LEARNING_RATE = 0.00001
 NUM_EPOCHS = 25
 
 # --- Prediction Settings ---
