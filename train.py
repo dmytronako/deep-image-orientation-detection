@@ -105,7 +105,7 @@ def train(args):
 
     # --- Model, Loss, Optimizer ---
     logging.info("\n--- Setting up Model ---")
-    model = get_orientation_model().to(device)
+    model = get_orientation_model(config.MODEL_NAME).to(device)
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1) # Add label_smoothing
     
     # Compile the model for performance if PyTorch 2.0+ is used
