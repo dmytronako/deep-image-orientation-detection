@@ -4,13 +4,22 @@ import torch.nn as nn
 import torchvision.models as models
 from config import NUM_CLASSES
 
-def get_orientation_model(pretrained=True):
+def get_orientation_model(model_name, pretrained=True):
     """
-    Loads a pre-trained EfficientNetV2-m model and replaces its final
+    Loads a pre-trained EfficientNet model and replaces its final
     layer for our 4-class orientation task.
     """
-    weights = models.EfficientNet_V2_M_Weights.IMAGENET1K_V1 if pretrained else None
-    model = models.efficientnet_v2_m(weights=weights)
+    if "efficientnet_v2_s" in model_name:
+        weights = models.EfficientNet_V2_S_Weights.IMAGENET1K_V1 if pretrained else None
+        model = models.efficientnet_v2_s(weights=weights)
+    elif "efficientnet_v2_m" in model_name:
+        weights = models.EfficientNet_V2_M_Weights.IMAGENET1K_V1 if pretrained else None
+        model = models.efficientnet_v2_m(weights=weights)
+    elif "efficientnet_v2_l" in model_name:
+        weights = models.EfficientNet_V2_L_Weights.IMAGENET1K_V1 if pretrained else None
+        model = models.efficientnet_v2_l(weights=weights)
+    else:
+        raise ValueError(f"Unsupported model name: {model_name}")
 
     # Freeze all parameters in the model
     for param in model.parameters():

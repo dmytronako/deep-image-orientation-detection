@@ -5,21 +5,23 @@ from PIL import Image
 import os
 import argparse
 import logging
+import time # Import the time module
 
 import config
 from src.model import get_orientation_model
 from src.utils import get_device, get_data_transforms, setup_logging, load_image_safely
 
 def predict_single_image(model, image_path, device, transforms):
-    """Predicts orientation for a single image file."""
+    """Predicts orientation for a single image file and logs the time taken."""
+    start_time = time.time() # Start timer for this image
+
     try:
-        #image = Image.open(image_path).convert('RGB')
         image = load_image_safely(image_path)
     except FileNotFoundError:
-        logging.error(f"File not found: {image_path}")
+        print(f"File not found: {image_path}")
         return
     except Exception as e:
-        logging.error(f"Error opening image {image_path}: {e}")
+        print(f"Error opening image {image_path}: {e}")
         return
 
     input_tensor = transforms(image).unsqueeze(0).to(device)
@@ -31,7 +33,10 @@ def predict_single_image(model, image_path, device, transforms):
     predicted_class = predicted_idx.item()
     result = config.CLASS_MAP[predicted_class]
     
-    logging.info(f"-> Image: '{os.path.basename(image_path)}' | Prediction: {result}")
+    end_time = time.time() # End timer for this image
+    duration = end_time - start_time
+    
+    print(f"-> Image: '{os.path.basename(image_path)}' | Prediction: {result} (Took {duration:.4f} seconds)")
 
 
 def run_prediction(args):
@@ -47,8 +52,15 @@ def run_prediction(args):
     transforms = all_transforms['val']
 
     # Load the trained model
-    model = get_orientation_model(pretrained=False) # No need to download weights
-    model.load_state_dict(torch.load(args.model_path, map_location=device))
+    model = get_orientation_model(config.MODEL_NAME, pretrained=False) # No need to download weights
+    
+    # Adjust state_dict keys if the model was compiled
+    state_dict = torch.load(args.model_path, map_location=device)
+    if next(iter(state_dict)).startswith('_orig_mod.'):
+        new_state_dict = {k.replace('_orig_mod.', ''): v for k, v in state_dict.items()}
+        model.load_state_dict(new_state_dict)
+    else:
+        model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 
@@ -58,15 +70,26 @@ def run_prediction(args):
         return
 
     if os.path.isfile(input_path):
+        print(f"Processing single image: {input_path}")
         predict_single_image(model, input_path, device, transforms)
     elif os.path.isdir(input_path):
-        logging.info(f"Processing all images in directory: {input_path}")
+        print(f"Processing all images in directory: {input_path}")
+        total_dir_start_time = time.time() # Start timer for the entire directory
         image_files = [f for f in os.listdir(input_path) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        
+        if not image_files:
+            print(f"No image files found in directory: {input_path}")
+            return
+
         for image_file in image_files:
             full_path = os.path.join(input_path, image_file)
             predict_single_image(model, full_path, device, transforms)
+        
+        total_dir_end_time = time.time() # End timer for the entire directory
+        total_duration = total_dir_end_time - total_dir_start_time
+        print(f"Finished processing directory '{input_path}'. Total time: {total_duration:.4f} seconds for {len(image_files)} images.")
     else:
-        logging.error(f"Input path is not a valid file or directory: {input_path}")
+        print(f"Input path is not a valid file or directory: {input_path}")
 
 
 if __name__ == '__main__':
