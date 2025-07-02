@@ -47,7 +47,7 @@ image_orientation_detector/
 ├───requirements.txt          # Python dependencies
 ├───train.py                  # Main script for training the model
 ├───data/
-│   ├───upright_images/       # Directory for your original, correctly oriented images
+│   ├───upright_images/       # Directory for correctly oriented images
 │   └───cache/                # Directory for cached, pre-rotated images (auto-generated)
 ├───models/
 │   └───best_model.pth        # The best trained model weights
@@ -70,26 +70,26 @@ pip install -r requirements.txt
 
 ### Prediction
 
-To predict the orientation of an image or a directory of images, use the `predict.py` script.
+To predict the orientation of an image or a directory of images, there's a `predict.py` script.
 
 - **Predict a single image:**
 
   ```bash
-  python predict.py --input_path /path/to/your/image.jpg
+  python predict.py --input_path /path/to/image.jpg
   ```
 - **Predict all images in a directory:**
 
   ```bash
-  python predict.py --input_path /path/to/your/directory/
+  python predict.py --input_path /path/to/directory/
   ```
 
 The script will output the predicted orientation for each image.
 
 ### Training
 
-This model learns to identify image orientation by training on a dataset of images that you provide. For the model to learn effectively, you must provide images that are correctly oriented.
+This model learns to identify image orientation by training on a dataset of images that you provide. For the model to learn effectively, provide images that are correctly oriented.
 
-**Place Images in the `data/upright_images` directory**: All your images must be placed in the `data/upright_images` directory. The training script will automatically generate rotated versions (90°, 180°, 270°) of these images and cache them for efficient training.
+**Place Images in the `data/upright_images` directory**: All images must be placed in the `data/upright_images` directory. The training script will automatically generate rotated versions (90°, 180°, 270°) of these images and cache them for efficient training.
 
 The directory structure should look like this:
 
@@ -103,46 +103,46 @@ data/
 
 ### Configure the Training
 
-All training parameters are centralized in the `config.py` file. Before starting the training, you can review and adjust the settings to match your hardware and dataset.
+All training parameters are centralized in the `config.py` file. Before starting the training, review and adjust the settings to match the hardware and dataset.
 
 Key configuration options in `config.py`:
 
 - **Paths and Caching**:
 
-  - `TRAIN_IMAGES_PATH`: Path to your upright images. Defaults to `data/upright_images`.
+  - `TRAIN_IMAGES_PATH`: Path to upright images. Defaults to `data/upright_images`.
   - `CACHE_PATH`: Directory where rotated images will be cached. Defaults to `data/cache`.
   - `USE_CACHE`: Set to `True` to use the cache on subsequent runs, significantly speeding up data loading but takes a lot of disk space.
 - **Model and Training Hyperparameters**:
 
   - `MODEL_NAME`: The name of the model architecture to use (e.g., `EfficientNetV2S`).
   - `IMAGE_SIZE`: The resolution to which images will be resized (e.g., `224` for 224x224 pixels).
-  - `BATCH_SIZE`: Number of images to process in each batch. Adjust based on your GPU's VRAM.
+  - `BATCH_SIZE`: Number of images to process in each batch. Adjust based on GPU's VRAM.
   - `NUM_EPOCHS`: The total number of times the model will iterate over the entire dataset.
   - `LEARNING_RATE`: The initial learning rate for the optimizer.
 
 ### Start Training
 
-Once your data is in place and the configuration is set, you can start training the model by running the `train.py` script:
+Once all data is in place and the configuration is set,  start training the model by running the `train.py` script:
 
 ```bash
 python train.py
 ```
 
-- **First Run**: The first time you run the script, it will preprocess and cache your dataset. This may take a while depending on the size of your dataset.
+- **First Run**: The first time the script runs, it will preprocess and cache the dataset. This may take a while depending on the size of the dataset.
 - **Subsequent Runs**: Later runs will be much faster as they will use the cached data.
 - **Monitoring**: Use TensorBoard to monitor training progress by running `tensorboard --logdir=runs`.
 
 ### Monitoring with TensorBoard
 
-The training script is integrated with TensorBoard to help you visualize metrics and understand the model's performance. During training, logs are saved in the `runs/` directory.
+The training script is integrated with TensorBoard to help visualize metrics and understand the model's performance. During training, logs are saved in the `runs/` directory.
 
-To launch TensorBoard, run the following command in your terminal:
+To launch TensorBoard, run the command:
 
 ```bash
 tensorboard --logdir=runs
 ```
 
-This will start a web server, and you can open the provided URL (usually `http://localhost:6006`) in your browser to view the dashboard.
+This will start a web server, open the provided URL (usually `http://localhost:6006`) in the browser to view the dashboard.
 
 In TensorBoard, you can track:
 
