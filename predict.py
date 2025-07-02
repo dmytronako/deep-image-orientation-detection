@@ -52,15 +52,11 @@ def run_prediction(args):
     transforms = all_transforms['val']
 
     # Load the trained model
-    model = get_orientation_model(config.MODEL_NAME, pretrained=False) # No need to download weights
+    model = get_orientation_model(pretrained=False) # No need to download weights
     
     # Adjust state_dict keys if the model was compiled
     state_dict = torch.load(args.model_path, map_location=device)
-    if next(iter(state_dict)).startswith('_orig_mod.'):
-        new_state_dict = {k.replace('_orig_mod.', ''): v for k, v in state_dict.items()}
-        model.load_state_dict(new_state_dict)
-    else:
-        model.load_state_dict(state_dict)
+    model.load_state_dict(state_dict)
     model.to(device)
     model.eval()
 

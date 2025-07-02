@@ -1,0 +1,162 @@
+# Image Orientation Detector
+
+This project implements a deep learning model to detect the orientation of images and determine the rotation needed to correct them. It uses a pre-trained EfficientNetV2 model from PyTorch, fine-tuned for the task of classifying images into four orientation categories: 0°, 90°, 180°, and 270°.
+
+The model achieves **97.53% accuracy** on the validation set.
+
+## Features
+
+- **High Accuracy:** Achieves 97.53% validation accuracy in classifying image orientation.
+- **EfficientNetV2:** Utilizes the powerful and efficient `EfficientNetV2-S` architecture.
+- **PyTorch Implementation:** Built with PyTorch, including features like:
+  - `torch.compile` for faster training on supported hardware.
+  - Mixed-precision training (`torch.amp`) for reduced memory usage and faster computation.
+  - Learning rate scheduling (`CosineAnnealingLR`) and `AdamW` optimizer for robust training.
+- **Image Caching:** Pre-processes and caches image rotations to reduce CPU significantly speed up training.
+- **Prediction Script:** Includes a script to predict the orientation of single images or entire directories.
+
+## Training Performance and Model History
+
+This model was trained on a single NVIDIA RTX 4080 GPU, taking approximately **3 hours and 20 minutes** to complete.
+
+The final model is using `EfficientNetV2-S`, but the project evolved through several iterations:
+
+- **ResNet18:** Achieved ~90% accuracy with a model size of around 30MB.
+- **ResNet50:** Improved accuracy to 95.26% with a model size of ~100MB.
+- **EfficientNetV2-S:** Reached the final accuracy of **97.53%** with ~80MB.
+
+## How It Works
+
+The model is trained on a dataset of images, where each image is rotated by 0°, 90°, 180°, and 270°. The model learns to predict which rotation has been applied. The prediction can then be used to determine the correction needed to bring the image to its upright orientation.
+
+The four classes correspond to the following rotations:
+
+- **Class 0:** Image is correctly oriented (0°).
+- **Class 1:** Image needs to be rotated 90° Counter-Clockwise to be correct.
+- **Class 2:** Image needs to be rotated 180° to be correct.
+- **Class 3:** Image needs to be rotated 90° Clockwise to be correct.
+
+## Dataset
+
+The model was trained on a diverse dataset to ensure robustness and accuracy. The training data includes:
+
+- **Microsoft COCO Dataset:** A large-scale object detection, segmentation, and captioning dataset ([link](https://cocodataset.org/)).
+- **Personal Images:** A small, curated collection of personal photographs to include unique examples and edge cases.
+- **AI-Generated vs. Real Images:** A dataset from Kaggle ([link](https://www.kaggle.com/datasets/cashbowman/ai-generated-images-vs-real-images)) was included to make the model aware of the typical orientations on different compositions found in art and illustrations.
+
+The combined dataset consists of **45,726** unique images. Each image is augmented by being rotated in four ways (0°, 90°, 180°, 270°), creating a total of **182,904** samples. This augmented dataset was then split into **146,323 samples for training** and **36,581 samples for validation**.
+
+## Project Structure
+
+```
+image_orientation_detector/
+├───.gitignore
+├───config.py                 # Main configuration file for paths, model, and hyperparameters
+├───convert_to_onnx.py        # Script to convert the PyTorch model to ONNX format
+├───predict.py                # Script for running inference on new images
+├───README.md                 # This file
+├───requirements.txt          # Python dependencies
+├───train.py                  # Main script for training the model
+├───data/
+│   ├───upright_images/       # Directory for your original, correctly oriented images
+│   └───cache/                # Directory for cached, pre-rotated images (auto-generated)
+├───models/
+│   └───best_model.pth        # The best trained model weights
+└───src/
+    ├───caching.py            # Logic for creating the image cache
+    ├───dataset.py            # PyTorch Dataset classes
+    ├───model.py              # Model definition (EfficientNetV2)
+    └───utils.py              # Utility functions (e.g., device setup, transforms)
+```
+
+### Usage
+
+## Getting Started
+
+Install the required Python packages using the `requirements.txt` file:
+
+```bash
+pip install -r requirements.txt
+```
+
+## Prediction
+
+To predict the orientation of an image or a directory of images, use the `predict.py` script.
+
+- **Predict a single image:**
+
+  ```bash
+  python predict.py --input_path /path/to/your/image.jpg
+  ```
+- **Predict all images in a directory:**
+
+  ```bash
+  python predict.py --input_path /path/to/your/directory/
+  ```
+
+The script will output the predicted orientation for each image.
+
+## Training
+
+This model learns to identify image orientation by training on a dataset of images that you provide. For the model to learn effectively, you must provide images that are correctly oriented.
+
+**Place Images in the `data/upright_images` directory**: All your images must be placed in the `data/upright_images` directory. The training script will automatically generate rotated versions (90°, 180°, 270°) of these images and cache them for efficient training.
+
+The directory structure should look like this:
+
+```
+data/
+└───upright_images/
+    ├───image1.jpg
+    ├───image2.png
+    └───...
+```
+
+### Configure the Training
+
+All training parameters are centralized in the `config.py` file. Before starting the training, you can review and adjust the settings to match your hardware and dataset.
+
+Key configuration options in `config.py`:
+
+- **Paths and Caching**:
+
+  - `TRAIN_IMAGES_PATH`: Path to your upright images. Defaults to `data/upright_images`.
+  - `CACHE_PATH`: Directory where rotated images will be cached. Defaults to `data/cache`.
+  - `USE_CACHE`: Set to `True` to use the cache on subsequent runs, significantly speeding up data loading but takes a lot of disk space.
+- **Model and Training Hyperparameters**:
+
+  - `MODEL_NAME`: The name of the model architecture to use (e.g., `EfficientNetV2S`).
+  - `IMAGE_SIZE`: The resolution to which images will be resized (e.g., `224` for 224x224 pixels).
+  - `BATCH_SIZE`: Number of images to process in each batch. Adjust based on your GPU's VRAM.
+  - `NUM_EPOCHS`: The total number of times the model will iterate over the entire dataset.
+  - `LEARNING_RATE`: The initial learning rate for the optimizer.
+
+### Start Training
+
+Once your data is in place and the configuration is set, you can start training the model by running the `train.py` script:
+
+```bash
+python train.py
+```
+
+- **First Run**: The first time you run the script, it will preprocess and cache your dataset. This may take a while depending on the size of your dataset.
+- **Subsequent Runs**: Later runs will be much faster as they will use the cached data.
+- **Monitoring**: Use TensorBoard to monitor training progress by running `tensorboard --logdir=runs`.
+
+### Monitoring with TensorBoard
+
+The training script is integrated with TensorBoard to help you visualize metrics and understand the model's performance. During training, logs are saved in the `runs/` directory.
+
+To launch TensorBoard, run the following command in your terminal:
+
+```bash
+tensorboard --logdir=runs
+```
+
+This will start a web server, and you can open the provided URL (usually `http://localhost:6006`) in your browser to view the dashboard.
+
+In TensorBoard, you can track:
+
+- **Accuracy:** `Accuracy/train` and `Accuracy/validation`
+- **Loss:** `Loss/train` and `Loss/validation`
+- **Learning Rate:** `Hyperparameters/learning_rate` to see how it changes over epochs.

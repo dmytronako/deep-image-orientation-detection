@@ -16,11 +16,11 @@ NUM_WORKERS = 4 # Or More, depending on your CPU cores
 
 # --- Model Configuration ---
 MODEL_SAVE_DIR = "models"
-MODEL_NAME = "orientation_model_v13_tensor_efficientnet_v2_s"
+MODEL_NAME = "orientation_model_v15_3_layers_tensor_efficientnet_v2_s"
 NUM_CLASSES = 4  # 0°, 90°, 180°, 270°
 
 # --- Training Hyperparameters ---
-LEARNING_RATE = 0.00001
+LEARNING_RATE = 0.00005
 NUM_EPOCHS = 25
 
 # --- Prediction Settings ---

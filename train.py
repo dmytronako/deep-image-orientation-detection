@@ -105,15 +105,23 @@ def train(args):
 
     # --- Model, Loss, Optimizer ---
     logging.info("\n--- Setting up Model ---")
-    model = get_orientation_model(config.MODEL_NAME).to(device)
-    criterion = nn.CrossEntropyLoss(label_smoothing=0.1) # Add label_smoothing
     
+    # Store the original model instance
+    original_model = get_orientation_model().to(device)
+
+    # This will be the model instance used for training/inference during the loop
+    # It might be the original_model itself, or its compiled version.
+    model_for_training = original_model 
+
     # Compile the model for performance if PyTorch 2.0+ is used
     if hasattr(torch, 'compile'):
         logging.info("PyTorch 2.0+ detected. Compiling the model for performance...")
-        model = torch.compile(model)
+        model_for_training = torch.compile(original_model) # Assign the compiled wrapper
         
-    optimizer = optim.AdamW(model.parameters(), lr=args.lr, weight_decay=1e-3) # Use AdamW and weight_decay
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1) # Add label_smoothing
+    
+    # Initialize optimizer with parameters of the model *used for training* (which might be compiled)
+    optimizer = optim.AdamW(model_for_training.parameters(), lr=args.lr, weight_decay=1e-3) # Use AdamW and weight_decay
     logging.info(f"Using pre-trained {config.MODEL_NAME} model. Final layers is trainable.")
     logging.info(f"Optimizer configured with AdamW, LR={args.lr}")
 
@@ -133,7 +141,7 @@ def train(args):
         epoch_start_time = time.time()
 
         # --- Training Phase ---
-        model.train()
+        model_for_training.train() # Use the compiled model
         running_loss, running_corrects = 0.0, 0
         for inputs, labels in train_loader:
             inputs, labels = inputs.to(device), labels.to(device)
@@ -141,7 +149,7 @@ def train(args):
             
             # Autocast operations to float16 where possible
             with amp.autocast(device_type="cuda", dtype=torch.float16):
-                outputs = model(inputs)
+                outputs = model_for_training(inputs) # Use the compiled model
                 loss = criterion(outputs, labels)
             
             # Scale loss before backward for mixed precision
@@ -157,11 +165,9 @@ def train(args):
         epoch_acc = running_corrects.float() / len(train_subset)
 
         # --- Validation Phase ---
-        model.eval()
+        model_for_training.eval() # Use the compiled model
         val_loss, val_corrects = 0.0, 0
-        
-        # Flag to log images only once per epoch
-        logged_images = False
+    
         
         with torch.no_grad():
             for inputs, labels in val_loader:
@@ -169,7 +175,7 @@ def train(args):
                 
                 # We can also use autocast in validation for a minor speedup, but it's less critical
                 with amp.autocast(device_type="cuda", dtype=torch.float16):
-                    outputs = model(inputs)
+                    outputs = model_for_training(inputs) # Use the compiled model
                     loss = criterion(outputs, labels)
                     
                 _, preds = torch.max(outputs, 1)
@@ -214,7 +220,10 @@ def train(args):
             unique_save_path = os.path.join(args.model_dir, unique_filename)
             static_save_path = os.path.join(args.model_dir, "best_model.pth")
             
-            torch.save(model.state_dict(), unique_save_path)
+            # Save the state_dict of the ORIGINAL model, not the compiled one.
+            # The original_model's parameters are updated by the compiled_model during training.
+            torch.save(original_model.state_dict(), unique_save_path)
+            
             shutil.copy(unique_save_path, static_save_path)
             best_model_path = unique_save_path
 
