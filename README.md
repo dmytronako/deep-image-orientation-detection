@@ -89,13 +89,13 @@ The script will output the predicted orientation for each image.
 
 This project also includes exporting the trained PyTorch model to the ONNX (Open Neural Network Exchange) format. This allows for faster inference, especially on hardware that doesn't have PyTorch installed.
 
-To convert the `.pth` model to `.onnx`:
+To convert a `.pth` model to `.onnx`, provide the path to the model file:
 
 ```bash
-python to_onnx.py
+python convert_to_onnx.py path/to/model.pth
 ```
 
-This will export the model set in `config.py` to `models/best_model.onnx`.
+This will create a `model.onnx` file in the same directory.
 
 To predict image orientation using the ONNX model:
 

@@ -4,12 +4,14 @@ import torch.onnx
 import onnx
 import onnxruntime
 import numpy as np
-import logging
+import argparse
+import os
 from src.model import get_orientation_model
 from src.utils import get_device
-from config import IMAGE_SIZE, MODEL_NAME
+from config import IMAGE_SIZE
 
 def convert_to_onnx(model_path, onnx_file_name):
+    
     # Instantiate and load the model
     device = get_device()
     model = get_orientation_model(pretrained=False)
@@ -65,4 +67,13 @@ def convert_to_onnx(model_path, onnx_file_name):
     print("Verification successful: PyTorch and ONNX Runtime outputs match.")
 
 if __name__ == '__main__':
-    convert_to_onnx(f"models/{MODEL_NAME}.pth", f"models/{MODEL_NAME}.onnx")
+    parser = argparse.ArgumentParser(description="Convert a PyTorch model to ONNX format.")
+    parser.add_argument("model_path", type=str, help="Path to the PyTorch model (.pth) file.")
+    args = parser.parse_args()
+
+    # Create the output path for the ONNX model
+    base_path = os.path.splitext(args.model_path)[0]
+    onnx_file_name = f"{base_path}.onnx"
+
+    print(f"Converting model {args.model_path} to {onnx_file_name}")
+    convert_to_onnx(args.model_path, onnx_file_name)
