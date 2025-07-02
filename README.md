@@ -4,17 +4,6 @@ This project implements a deep learning model to detect the orientation of image
 
 The model achieves **97.53% accuracy** on the validation set.
 
-## Features
-
-- **High Accuracy:** Achieves 97.53% validation accuracy in classifying image orientation.
-- **EfficientNetV2:** Utilizes the powerful and efficient `EfficientNetV2-S` architecture.
-- **PyTorch Implementation:** Built with PyTorch, including features like:
-  - `torch.compile` for faster training on supported hardware.
-  - Mixed-precision training (`torch.amp`) for reduced memory usage and faster computation.
-  - Learning rate scheduling (`CosineAnnealingLR`) and `AdamW` optimizer for robust training.
-- **Image Caching:** Pre-processes and caches image rotations to reduce CPU significantly speed up training.
-- **Prediction Script:** Includes a script to predict the orientation of single images or entire directories.
-
 ## Training Performance and Model History
 
 This model was trained on a single NVIDIA RTX 4080 GPU, taking approximately **3 hours and 20 minutes** to complete.
@@ -23,7 +12,7 @@ The final model is using `EfficientNetV2-S`, but the project evolved through sev
 
 - **ResNet18:** Achieved ~90% accuracy with a model size of around 30MB.
 - **ResNet50:** Improved accuracy to 95.26% with a model size of ~100MB.
-- **EfficientNetV2-S:** Reached the final accuracy of **97.53%** with ~80MB.
+- **EfficientNetV2-S:** Reached the "final" (for now) accuracy of **97.53%** with ~80MB.
 
 ## How It Works
 
@@ -38,11 +27,11 @@ The four classes correspond to the following rotations:
 
 ## Dataset
 
-The model was trained on a diverse dataset to ensure robustness and accuracy. The training data includes:
+The model was trained on several datasets:
 
 - **Microsoft COCO Dataset:** A large-scale object detection, segmentation, and captioning dataset ([link](https://cocodataset.org/)).
-- **Personal Images:** A small, curated collection of personal photographs to include unique examples and edge cases.
 - **AI-Generated vs. Real Images:** A dataset from Kaggle ([link](https://www.kaggle.com/datasets/cashbowman/ai-generated-images-vs-real-images)) was included to make the model aware of the typical orientations on different compositions found in art and illustrations.
+- **Personal Images:** A small, curated collection of personal photographs to include unique examples and edge cases.
 
 The combined dataset consists of **45,726** unique images. Each image is augmented by being rotated in four ways (0°, 90°, 180°, 270°), creating a total of **182,904** samples. This augmented dataset was then split into **146,323 samples for training** and **36,581 samples for validation**.
 
@@ -69,9 +58,9 @@ image_orientation_detector/
     └───utils.py              # Utility functions (e.g., device setup, transforms)
 ```
 
-### Usage
+## Usage
 
-## Getting Started
+### Getting Started
 
 Install the required Python packages using the `requirements.txt` file:
 
@@ -79,7 +68,7 @@ Install the required Python packages using the `requirements.txt` file:
 pip install -r requirements.txt
 ```
 
-## Prediction
+### Prediction
 
 To predict the orientation of an image or a directory of images, use the `predict.py` script.
 
@@ -96,7 +85,7 @@ To predict the orientation of an image or a directory of images, use the `predic
 
 The script will output the predicted orientation for each image.
 
-## Training
+### Training
 
 This model learns to identify image orientation by training on a dataset of images that you provide. For the model to learn effectively, you must provide images that are correctly oriented.
 
