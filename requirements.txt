@@ -5,3 +5,5 @@ numpy
 albumentations
 tqdm
 tensorboard
+onnx
+onnxruntime

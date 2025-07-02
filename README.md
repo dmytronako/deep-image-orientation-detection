@@ -85,6 +85,50 @@ To predict the orientation of an image or a directory of images, there's a `pred
 
 The script will output the predicted orientation for each image.
 
+### ONNX Export and Prediction
+
+This project also includes exporting the trained PyTorch model to the ONNX (Open Neural Network Exchange) format. This allows for faster inference, especially on hardware that doesn't have PyTorch installed.
+
+To convert the `.pth` model to `.onnx`:
+
+```bash
+python to_onnx.py
+```
+
+This will export the model set in `config.py` to `models/best_model.onnx`.
+
+To predict image orientation using the ONNX model:
+
+-   **Predict a single image:**
+
+    ```bash
+    python predict_onnx.py --input_path /path/to/image.jpg
+    ```
+-   **Predict all images in a directory:**
+
+    ```bash
+    python predict_onnx.py --input_path /path/to/directory/
+    ```
+
+#### ONNX GPU Acceleration (Optional)
+
+For even better performance on NVIDIA GPUs, you can install the GPU-enabled version of ONNX Runtime.
+
+```bash
+pip install onnxruntime-gpu
+```
+
+Make sure you have a compatible CUDA toolkit installed on your system. The `predict_onnx.py` script will automatically try to use the CUDA provider if it's available.
+
+#### Performance Comparison (PyTorch vs. ONNX)
+
+For a dataset of 5055 images, the performance on a RTX 4080 running in **single-thread** was:
+
+-   **PyTorch (`predict.py`):** 135.71 seconds
+-   **ONNX (`predict_onnx.py`):** 78.99 seconds
+
+This demonstrates a significant performance gain of approximately **41.8%** when using the ONNX model for inference.
+
 ### Training
 
 This model learns to identify image orientation by training on a dataset of images that you provide. For the model to learn effectively, provide images that are correctly oriented.
