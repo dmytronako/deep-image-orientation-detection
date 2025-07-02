@@ -7,9 +7,10 @@ import onnxruntime
 import numpy as np
 
 import config
-from src.utils import get_device, get_data_transforms, setup_logging, load_image_safely
+import torchvision.transforms as T
+from src.utils import setup_logging, load_image_safely
 
-def predict_single_image_onnx(ort_session, image_path, device, transforms):
+def predict_single_image_onnx(ort_session, image_path, image_transforms):
     """Predicts orientation for a single image file using the ONNX model and logs the time taken."""
     
     start_time = time.time() # Start timer
@@ -24,7 +25,7 @@ def predict_single_image_onnx(ort_session, image_path, device, transforms):
         return
 
     # Apply transformations and convert to NumPy array for ONNX Runtime
-    input_tensor = transforms(image).unsqueeze(0).cpu().numpy()
+    input_tensor = image_transforms(image).unsqueeze(0).cpu().numpy()
     
     # Get input name from the ONNX session
     ort_inputs = {ort_session.get_inputs()[0].name: input_tensor}
@@ -53,11 +54,13 @@ def run_prediction_onnx(args):
         logging.error(f"ONNX model file not found at {args.model_path}.")
         return
 
-    # ONNX Runtime does not need a torch device; it handles its own execution provider
-    # However, we still need transforms that might expect a device (though not for numpy conversion)
-    device = get_device() # This is mainly for logging now, not for actual ONNX inference device assignment
-    all_transforms = get_data_transforms()
-    transforms = all_transforms['val']
+    # Define the same transformations used during validation.
+    image_transforms = T.Compose([
+        T.Resize((config.IMAGE_SIZE + 32, config.IMAGE_SIZE + 32)),
+        T.CenterCrop(config.IMAGE_SIZE),
+        T.ToTensor(),
+        T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
 
     # Load the ONNX model, explicitly trying to use CUDA
     try:
@@ -75,7 +78,7 @@ def run_prediction_onnx(args):
 
     if os.path.isfile(input_path):
         print(f"Processing single image: {input_path}")
-        predict_single_image_onnx(ort_session, input_path, device, transforms)
+        predict_single_image_onnx(ort_session, input_path, image_transforms)
     elif os.path.isdir(input_path):
         print(f"Processing all images in directory: {input_path}")
         total_dir_start_time = time.time() # Start timer for the entire directory
@@ -87,7 +90,7 @@ def run_prediction_onnx(args):
 
         for image_file in image_files:
             full_path = os.path.join(input_path, image_file)
-            predict_single_image_onnx(ort_session, full_path, device, transforms)
+            predict_single_image_onnx(ort_session, full_path, image_transforms)
         
         total_dir_end_time = time.time() # End timer
         total_duration = total_dir_end_time - total_dir_start_time

@@ -99,16 +99,16 @@ This will create a `model.onnx` file in the same directory.
 
 To predict image orientation using the ONNX model:
 
--   **Predict a single image:**
+- **Predict a single image:**
 
-    ```bash
-    python predict_onnx.py --input_path /path/to/image.jpg
-    ```
--   **Predict all images in a directory:**
+  ```bash
+  python predict_onnx.py --input_path /path/to/image.jpg
+  ```
+- **Predict all images in a directory:**
 
-    ```bash
-    python predict_onnx.py --input_path /path/to/directory/
-    ```
+  ```bash
+  python predict_onnx.py --input_path /path/to/directory/
+  ```
 
 #### ONNX GPU Acceleration (Optional)
 
@@ -124,10 +124,10 @@ Make sure you have a compatible CUDA toolkit installed on your system. The `pred
 
 For a dataset of 5055 images, the performance on a RTX 4080 running in **single-thread** was:
 
--   **PyTorch (`predict.py`):** 135.71 seconds
--   **ONNX (`predict_onnx.py`):** 78.99 seconds
+- **PyTorch (`predict.py`):** 135.71 seconds
+- **ONNX (`predict_onnx.py`):** 60.83 seconds
 
-This demonstrates a significant performance gain of approximately **41.8%** when using the ONNX model for inference.
+This demonstrates a significant performance gain of approximately **55.2%** when using the ONNX model for inference.
 
 ### Training
 
