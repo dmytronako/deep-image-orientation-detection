@@ -1,5 +1,3 @@
-# /src/model.py
-
 import torch.nn as nn
 import torchvision.models as models
 from config import NUM_CLASSES
@@ -23,7 +21,6 @@ def get_orientation_model(pretrained=True):
         param.requires_grad = True
     #for param in model.features[-3].parameters(): # This will probably provide even better results >97%, but it is taking around 1 hour per epoch.
         #param.requires_grad = True
-        
         
     # Get the number of input features for the classifier
     num_ftrs = model.classifier[1].in_features

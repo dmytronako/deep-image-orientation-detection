@@ -8,10 +8,9 @@ from PIL import Image
 
 import torchvision.transforms as transforms
 import config
-from src.utils import load_image_safely # Use the robust loader
+from src.utils import load_image_safely
 
-# This is the original, on-the-fly dataset. We'll keep it for comparison
-# or for cases where caching is not desired.
+# Dataset for cases where caching is not desired
 class ImageOrientationDataset(Dataset):
     def __init__(self, upright_dir, transform=None):
         self.upright_dir = upright_dir
@@ -60,7 +59,7 @@ class ImageOrientationDataset(Dataset):
 
 
 # This dataset reads directly from the pre-processed and cached images.
-# It is significantly faster as it only has to do a file read and basic tensor conversion.
+# This is significantly faster (if run on a fast disk) as it only has to do a file read and basic tensor conversion.
 class ImageOrientationDatasetFromCache(Dataset):
     def __init__(self, cache_dir, transform=None):
         self.cache_dir = cache_dir

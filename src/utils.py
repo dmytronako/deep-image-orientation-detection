@@ -43,10 +43,10 @@ def get_data_transforms() -> dict:
             transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
             # Increase the rotation slightly
             transforms.RandomRotation(15), 
-            # New augmentation: Random Erasing
+            # Random Erasing
             transforms.ToTensor(), # ToTensor must come before Normalize and Erasing
             transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            # Randomly erase a patch of the image, forcing the model to look at context
+            # Randomly erase a patch of the image, to make the model look at context
             transforms.RandomErasing(p=0.5, scale=(0.02, 0.2)),
         ]),
         'val': transforms.Compose([
