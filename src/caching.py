@@ -9,8 +9,7 @@ def robust_open_image(path: str) -> Image.Image:
     """
     Safely opens an image and converts it to a 3-channel RGB format.
     This handles palletized images and images with transparency by
-    compositing them onto a white background. This is the most robust
-    way to prevent processing errors and warnings from Pillow.
+    compositing them onto a white background.
     """
     img = Image.open(path)
     if img.mode in ('RGB', 'L'):
@@ -49,7 +48,7 @@ def process_and_cache_image(image_path: str):
 def cache_dataset(force_rebuild=False):
     """
     Applies rotations to all images and saves them to a cache, using
-    multiple processes. Includes detailed logging for cache status.
+    multiple processes.
     """
     upright_dir = config.DATA_DIR
     cache_dir = config.CACHE_DIR
@@ -73,7 +72,6 @@ def cache_dataset(force_rebuild=False):
         return
     else:
         logging.info("Cache is empty or was cleared. Starting build process...")
-    # --- End Enhanced Check ---
 
     image_files = [os.path.join(root, f) for root, _, files in os.walk(upright_dir)
                    for f in files if f.lower().endswith(('.png', '.jpg', '.jpeg'))]

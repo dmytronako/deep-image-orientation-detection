@@ -10,7 +10,7 @@ import logging
 import shutil
 import time
 
-import torch.amp as amp # Updated for modern AMP API
+import torch.amp as amp
 import config
 from src.caching import cache_dataset
 from src.dataset import ImageOrientationDataset, ImageOrientationDatasetFromCache
@@ -18,8 +18,6 @@ from src.model import get_orientation_model
 from src.utils import get_device, setup_logging, get_data_transforms
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.tensorboard import SummaryWriter
-import torchvision
-from torchvision.utils import draw_bounding_boxes
 
 def train(args):
     """Main training routine."""
@@ -62,12 +60,12 @@ def train(args):
 
     try:
         if config.USE_CACHE:
-            # 1. Trigger the caching process
+            # Trigger the caching process
             cache_dataset(force_rebuild=args.force_rebuild_cache)
-            # 2. Use the dataset that reads from the cache, but WITHOUT a transform initially
+            # Use the dataset that reads from the cache, but WITHOUT a transform initially
             full_dataset = ImageOrientationDatasetFromCache(
                 cache_dir=config.CACHE_DIR,
-                transform=None  # IMPORTANT: Apply transform only after splitting
+                transform=None  # Apply transform only after splitting
             )
             logging.info(f"Successfully loaded dataset from CACHE ({len(full_dataset)} images).")
         else:
@@ -75,7 +73,7 @@ def train(args):
             logging.info("Using ON-THE-FLY image processing (caching is disabled).")
             full_dataset = ImageOrientationDataset(
                 upright_dir=args.data_dir,
-                transform=None # IMPORTANT: Apply transform after splitting
+                transform=None # Apply transform after splitting
             )
             logging.info(f"Successfully loaded dataset for on-the-fly processing.")
 
@@ -103,14 +101,12 @@ def train(args):
     val_loader = DataLoader(val_subset, batch_size=args.batch_size, shuffle=False, num_workers=args.workers, pin_memory=pin_memory_enabled)
     logging.info("Dataloaders created successfully.")
 
-    # --- Model, Loss, Optimizer ---
     logging.info("\n--- Setting up Model ---")
     
     # Store the original model instance
     original_model = get_orientation_model().to(device)
 
     # This will be the model instance used for training/inference during the loop
-    # It might be the original_model itself, or its compiled version.
     model_for_training = original_model 
 
     # Compile the model for performance if PyTorch 2.0+ is used
@@ -120,8 +116,9 @@ def train(args):
         
     criterion = nn.CrossEntropyLoss(label_smoothing=0.1) # Add label_smoothing
     
-    # Initialize optimizer with parameters of the model *used for training* (which might be compiled)
-    optimizer = optim.AdamW(model_for_training.parameters(), lr=args.lr, weight_decay=1e-3) # Use AdamW and weight_decay
+    # Initialize optimizer with parameters of the model used for training
+    # AdamW and weight_decay
+    optimizer = optim.AdamW(model_for_training.parameters(), lr=args.lr, weight_decay=1e-3)
     logging.info(f"Using pre-trained {config.MODEL_NAME} model. Final layers is trainable.")
     logging.info(f"Optimizer configured with AdamW, LR={args.lr}")
 
@@ -131,7 +128,7 @@ def train(args):
     best_val_acc = 0.0
     best_model_path = ""
 
-    # Add these two lines for early stopping
+    # Early stopping
     epochs_no_improve = 0
     early_stop_patience = 7 # Stop after 7 epochs of no improvement
     scaler = amp.GradScaler() # Initialize GradScaler for Mixed Precision
@@ -141,7 +138,7 @@ def train(args):
         epoch_start_time = time.time()
 
         # --- Training Phase ---
-        model_for_training.train() # Use the compiled model
+        model_for_training.train()
         running_loss, running_corrects = 0.0, 0
         for inputs, labels in train_loader:
             inputs, labels = inputs.to(device), labels.to(device)
@@ -149,7 +146,7 @@ def train(args):
             
             # Autocast operations to float16 where possible
             with amp.autocast(device_type="cuda", dtype=torch.float16):
-                outputs = model_for_training(inputs) # Use the compiled model
+                outputs = model_for_training(inputs)
                 loss = criterion(outputs, labels)
             
             # Scale loss before backward for mixed precision
@@ -165,17 +162,16 @@ def train(args):
         epoch_acc = running_corrects.float() / len(train_subset)
 
         # --- Validation Phase ---
-        model_for_training.eval() # Use the compiled model
+        model_for_training.eval()
         val_loss, val_corrects = 0.0, 0
-    
-        
+
         with torch.no_grad():
             for inputs, labels in val_loader:
                 inputs, labels = inputs.to(device), labels.to(device)
                 
-                # We can also use autocast in validation for a minor speedup, but it's less critical
+                # Use autocast in validation for a minor speedup
                 with amp.autocast(device_type="cuda", dtype=torch.float16):
-                    outputs = model_for_training(inputs) # Use the compiled model
+                    outputs = model_for_training(inputs)
                     loss = criterion(outputs, labels)
                     
                 _, preds = torch.max(outputs, 1)
@@ -189,9 +185,9 @@ def train(args):
 
         scheduler.step()
         
-        epoch_duration = time.time() - epoch_start_time ### EPOCH DURATION
+        # Measure epoch duration
+        epoch_duration = time.time() - epoch_start_time
 
-        ### Added epoch duration to the log line
         logging.info(
             f"Epoch {epoch+1:02d}/{args.epochs} | "
             f"Train Loss: {epoch_loss:.4f} Acc: {epoch_acc:.4f} | "
@@ -204,9 +200,8 @@ def train(args):
         writer.add_scalar('Accuracy/train', epoch_acc, epoch)
         writer.add_scalar('Loss/validation', val_epoch_loss, epoch)
         writer.add_scalar('Accuracy/validation', val_epoch_acc, epoch)
-        # Log the learning rate to see the scheduler work
+        # Log the learning rate to see the scheduler
         writer.add_scalar('Hyperparameters/learning_rate', optimizer.param_groups[0]['lr'], epoch)
-        # -------------------------------------------------
 
         # --- MODEL SAVING LOGIC ---
         current_acc = val_epoch_acc.item()
@@ -229,7 +224,7 @@ def train(args):
 
             # Reset the counter when we find a new best model
             epochs_no_improve = 0
-            logging.info(f"  -> 🎉 New best model saved! Val Acc: {best_val_acc:.4f}")            
+            logging.info(f"   New best model saved! Val Acc: {best_val_acc:.4f}")            
         else:
             # Increment the counter if no improvement
             epochs_no_improve += 1
@@ -238,10 +233,10 @@ def train(args):
         if epochs_no_improve >= early_stop_patience:
             logging.info(f"\n--- Early stopping triggered after {early_stop_patience} epochs with no improvement. ---")
             logging.info(f"Best validation accuracy was {best_val_acc:.4f} at epoch {epoch - early_stop_patience + 1}.")
-            break # Exit the training loop
+            break
 
 
-    ### FINAL SUMMARY BLOCK
+    # SUMMARY
     total_duration = time.time() - training_start_time
     total_minutes = total_duration / 60
     logging.info("\n=================================================")

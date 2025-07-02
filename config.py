@@ -1,12 +1,5 @@
-import torch
-
-# --- Caching ---
-# If True, the script will pre-process and cache all image rotations.
-# This is much faster for training, but requires disk space.
-# If False, rotations are done on-the-fly in memory.
-USE_CACHE = True
+USE_CACHE = True # This is much faster for training, but requires disk space.
 CACHE_DIR = "data/cache"
-
 
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"

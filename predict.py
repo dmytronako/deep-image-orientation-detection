@@ -1,11 +1,8 @@
-# /predict.py
-
 import torch
-from PIL import Image
 import os
 import argparse
 import logging
-import time # Import the time module
+import time
 
 import config
 from src.model import get_orientation_model
@@ -13,7 +10,8 @@ from src.utils import get_device, get_data_transforms, setup_logging, load_image
 
 def predict_single_image(model, image_path, device, transforms):
     """Predicts orientation for a single image file and logs the time taken."""
-    start_time = time.time() # Start timer for this image
+    
+    start_time = time.time() # Start timer
 
     try:
         image = load_image_safely(image_path)
@@ -33,7 +31,7 @@ def predict_single_image(model, image_path, device, transforms):
     predicted_class = predicted_idx.item()
     result = config.CLASS_MAP[predicted_class]
     
-    end_time = time.time() # End timer for this image
+    end_time = time.time() # End timer
     duration = end_time - start_time
     
     print(f"-> Image: '{os.path.basename(image_path)}' | Prediction: {result} (Took {duration:.4f} seconds)")
@@ -81,7 +79,7 @@ def run_prediction(args):
             full_path = os.path.join(input_path, image_file)
             predict_single_image(model, full_path, device, transforms)
         
-        total_dir_end_time = time.time() # End timer for the entire directory
+        total_dir_end_time = time.time() # End timer
         total_duration = total_dir_end_time - total_dir_start_time
         print(f"Finished processing directory '{input_path}'. Total time: {total_duration:.4f} seconds for {len(image_files)} images.")
     else:
