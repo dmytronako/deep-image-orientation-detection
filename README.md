@@ -62,7 +62,7 @@ image_orientation_detector/
 
 ### Getting Started
 
-You can download the pre-trained model (`orientation_model_xx.pth`) and its ONNX version (`orientation_model_xx.onnx`) from the [GitHub Releases](https://github.com/your-repo/your-project/releases) page.
+Download the pre-trained model (`orientation_model_xx.pth`) and its ONNX version (`orientation_model_xx.onnx`) from the [GitHub Releases](https://github.com/duartebarbosadev/deep-image-orientation-detection/releases) page.
 
 Install the required Python packages using the `requirements.txt` file:
 
