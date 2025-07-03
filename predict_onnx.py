@@ -43,7 +43,7 @@ def predict_single_image_onnx(ort_session, image_path, image_transforms):
     end_time = time.time() # End timer
     duration = end_time - start_time
     
-    print(f"-> Image: '{os.path.basename(image_path)}' | Prediction: {result}")
+    print(f"-> Image: '{os.path.basename(image_path)}' | Prediction: {result} (Took {duration:.4f} seconds)")
 
 
 def run_prediction_onnx(args):
