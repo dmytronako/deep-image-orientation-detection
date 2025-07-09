@@ -4,12 +4,12 @@ CACHE_DIR = "data/cache"
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"
 IMAGE_SIZE = 384
-BATCH_SIZE = 256
+BATCH_SIZE = 128
 NUM_WORKERS = 4 # Or More, depending on your CPU cores
 
 # --- Model Configuration ---
 MODEL_SAVE_DIR = "models"
-MODEL_NAME = "orientation_model_v15_3_layers_tensor_efficientnet_v2_s"
+MODEL_NAME = "orientation_model_v3"
 NUM_CLASSES = 4  # 0°, 90°, 180°, 270°
 
 # --- Training Hyperparameters ---

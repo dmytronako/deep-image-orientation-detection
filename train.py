@@ -30,6 +30,7 @@ def train(args):
     if config.USE_CACHE:
         logging.info(f"  - Cache Directory: {config.CACHE_DIR}")
         logging.info(f"  - Force Rebuild Cache: {args.force_rebuild_cache}")
+    logging.info(f"  - Resume from checkpoint: {args.resume}")
     logging.info(f"  - Source Data Directory: {args.data_dir}")
     logging.info(f"  - Model Save Directory: {args.model_dir}")
     logging.info(f"  - Number of Epochs: {args.epochs}")
@@ -122,32 +123,59 @@ def train(args):
 
     # Add scheduler
     scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=args.epochs, eta_min=1e-6)
-    # --- Training Loop ---
-    best_val_acc = 0.0
-    best_model_path = ""
-
-    # Early stopping
-    epochs_no_improve = 0
-    early_stop_patience = 7 # Stop after 7 epochs of no improvement
     scaler = amp.GradScaler() # Initialize GradScaler for Mixed Precision
+    
+    # --- Checkpoint Loading ---
+    start_epoch = 0
+    best_val_acc = 0.0
+    epochs_no_improve = 0
+    best_model_path = ""
+    checkpoint_path = os.path.join(args.model_dir, "checkpoint.pth")
 
-    logging.info("\n--- Starting Training Loop ---")
-    for epoch in range(args.epochs):
+    if args.resume and os.path.exists(checkpoint_path):
+        logging.info(f"\n--- Resuming training from checkpoint: {checkpoint_path} ---")
+        try:
+            checkpoint = torch.load(checkpoint_path, map_location=device)
+            
+            # Load model state
+            original_model.load_state_dict(checkpoint['model_state_dict'])
+            
+            # Load optimizer, scheduler, and scaler states
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+            scheduler.load_state_dict(checkpoint['scheduler_state_dict'])
+            scaler.load_state_dict(checkpoint['scaler_state_dict'])
+            
+            # Load training progress
+            start_epoch = checkpoint['epoch'] + 1
+            best_val_acc = checkpoint.get('best_val_acc', 0.0)
+            epochs_no_improve = checkpoint.get('epochs_no_improve', 0)
+            
+            logging.info(f"Resumed from epoch {start_epoch}. Best Val Acc: {best_val_acc:.4f}")
+        except Exception as e:
+            logging.error(f"Error loading checkpoint: {e}. Starting from scratch.")
+            start_epoch = 0
+            best_val_acc = 0.0
+    else:
+        logging.info("\n--- Starting Training Loop from scratch ---")
+
+
+    # --- Training Loop ---
+    early_stop_patience = 7 # Stop after 7 epochs of no improvement
+
+    for epoch in range(start_epoch, args.epochs):
         epoch_start_time = time.time()
 
         # --- Training Phase ---
         model_for_training.train()
         running_loss, running_corrects = 0.0, 0
         for inputs, labels in train_loader:
-            inputs, labels = inputs.to(device), labels.to(device)
-            optimizer.zero_grad()
+            inputs, labels = inputs.to(device, non_blocking=True), labels.to(device, non_blocking=True)
+            optimizer.zero_grad(set_to_none=True)
             
-            # Autocast operations to float16 where possible
             with amp.autocast(device_type="cuda", dtype=torch.float16):
                 outputs = model_for_training(inputs)
                 loss = criterion(outputs, labels)
             
-            # Scale loss before backward for mixed precision
             scaler.scale(loss).backward()
             scaler.step(optimizer)
             scaler.update()
@@ -165,9 +193,8 @@ def train(args):
 
         with torch.no_grad():
             for inputs, labels in val_loader:
-                inputs, labels = inputs.to(device), labels.to(device)
+                inputs, labels = inputs.to(device, non_blocking=True), labels.to(device, non_blocking=True)
                 
-                # Use autocast in validation for a minor speedup
                 with amp.autocast(device_type="cuda", dtype=torch.float16):
                     outputs = model_for_training(inputs)
                     loss = criterion(outputs, labels)
@@ -175,15 +202,12 @@ def train(args):
                 _, preds = torch.max(outputs, 1)
                 val_loss += loss.item() * inputs.size(0)
                 val_corrects += torch.sum(preds == labels.data)
-
-                
                     
         val_epoch_loss = val_loss / len(val_subset)
         val_epoch_acc = val_corrects.float() / len(val_subset)
 
         scheduler.step()
         
-        # Measure epoch duration
         epoch_duration = time.time() - epoch_start_time
 
         logging.info(
@@ -198,34 +222,33 @@ def train(args):
         writer.add_scalar('Accuracy/train', epoch_acc, epoch)
         writer.add_scalar('Loss/validation', val_epoch_loss, epoch)
         writer.add_scalar('Accuracy/validation', val_epoch_acc, epoch)
-        # Log the learning rate to see the scheduler
         writer.add_scalar('Hyperparameters/learning_rate', optimizer.param_groups[0]['lr'], epoch)
 
-        # --- MODEL SAVING LOGIC ---
+        # --- MODEL AND CHECKPOINT SAVING LOGIC ---
         current_acc = val_epoch_acc.item()
         if current_acc > best_val_acc:
-            if os.path.exists(best_model_path):
-                logging.debug(f"Removing old best model: {os.path.basename(best_model_path)}")
-                os.remove(best_model_path)
-
             best_val_acc = current_acc
-            unique_filename = f"{config.MODEL_NAME}_epoch_{epoch+1}_vacc_{best_val_acc:.4f}.pth"
-            unique_save_path = os.path.join(args.model_dir, unique_filename)
-            static_save_path = os.path.join(args.model_dir, "best_model.pth")
+            epochs_no_improve = 0 # Reset counter
             
-            # Save the state_dict of the ORIGINAL model, not the compiled one.
-            # The original_model's parameters are updated by the compiled_model during training.
-            torch.save(original_model.state_dict(), unique_save_path)
-            
-            shutil.copy(unique_save_path, static_save_path)
-            best_model_path = unique_save_path
-
-            # Reset the counter when we find a new best model
-            epochs_no_improve = 0
+            # Save the best model state_dict
+            best_model_path = os.path.join(args.model_dir, "best_model.pth")
+            torch.save(original_model.state_dict(), best_model_path)
             logging.info(f"   New best model saved! Val Acc: {best_val_acc:.4f}")            
         else:
-            # Increment the counter if no improvement
             epochs_no_improve += 1
+
+        # Save checkpoint at the end of every epoch
+        checkpoint = {
+            'epoch': epoch,
+            'model_state_dict': original_model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'scheduler_state_dict': scheduler.state_dict(),
+            'scaler_state_dict': scaler.state_dict(),
+            'best_val_acc': best_val_acc,
+            'epochs_no_improve': epochs_no_improve,
+        }
+        torch.save(checkpoint, checkpoint_path)
+        logging.debug(f"Checkpoint saved to {checkpoint_path}")
 
         # --- Check for early stopping ---
         if epochs_no_improve >= early_stop_patience:
@@ -241,10 +264,9 @@ def train(args):
     logging.info("              TRAINING COMPLETE")
     logging.info("=================================================")
     logging.info(f"Total Training Time: {total_duration:.2f} seconds ({total_minutes:.2f} minutes)")
-    if best_model_path:
+    if os.path.exists(os.path.join(args.model_dir, "best_model.pth")):
         logging.info(f"Best Validation Accuracy: {best_val_acc:.4f}")
-        logging.info(f"Final best model saved as: {os.path.basename(best_model_path)}")
-        logging.info(f"A copy is also available as: best_model.pth")
+        logging.info(f"Final best model saved as: best_model.pth")
     else:
         logging.warning("No model was saved as validation accuracy did not improve from its initial state.")
     logging.info("=================================================")
@@ -262,6 +284,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr', type=float, default=config.LEARNING_RATE, help='Learning rate.')
     parser.add_argument('--workers', type=int, default=config.NUM_WORKERS, help='Number of data loading workers.')
     parser.add_argument('--force-rebuild-cache', action='store_true', help='If set, clears and rebuilds the image cache.')
+    parser.add_argument('--resume', action='store_true', help='Resume training from the last checkpoint.')
     
     args = parser.parse_args()
     train(args)

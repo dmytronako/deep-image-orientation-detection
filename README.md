@@ -1,18 +1,21 @@
 # Image Orientation Detector
+<a href="https://huggingface.co/spaces/DuarteBarbosa/deep-image-orientation-detection" target="_blank" style="margin: 2px;">
+    <img alt="Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue" style="display: inline-block; vertical-align: middle;"/>
+</a>
 
 This project implements a deep learning model to detect the orientation of images and determine the rotation needed to correct them. It uses a pre-trained EfficientNetV2 model from PyTorch, fine-tuned for the task of classifying images into four orientation categories: 0°, 90°, 180°, and 270°.
 
-The model achieves **97.53% accuracy** on the validation set.
+The model achieves **98.12% accuracy** on the validation set.
 
 ## Training Performance and Model History
 
-This model was trained on a single NVIDIA RTX 4080 GPU, taking approximately **3 hours and 20 minutes** to complete.
+This model was trained on a single NVIDIA RTX 4080 GPU, taking approximately **4 hours and 56.4 minutes** to complete.
 
 The final model is using `EfficientNetV2-S`, but the project evolved through several iterations:
 
 - **ResNet18:** Achieved ~90% accuracy with a model size of around 30MB.
 - **ResNet50:** Improved accuracy to 95.26% with a model size of ~100MB.
-- **EfficientNetV2-S:** Reached the "final" (for now) accuracy of **97.53%** with ~80MB.
+- **EfficientNetV2-S:** Reached the "final" (for now) accuracy of **98.12%** with ~78MB.
 
 ## How It Works
 
@@ -31,9 +34,10 @@ The model was trained on several datasets:
 
 - **Microsoft COCO Dataset:** A large-scale object detection, segmentation, and captioning dataset ([link](https://cocodataset.org/)).
 - **AI-Generated vs. Real Images:** A dataset from Kaggle ([link](https://www.kaggle.com/datasets/cashbowman/ai-generated-images-vs-real-images)) was included to make the model aware of the typical orientations on different compositions found in art and illustrations.
+- **TextOCR - Text Extraction from Images Dataset:** A dataset from Kaggle ([link](https://www.kaggle.com/datasets/robikscube/textocr-text-extraction-from-images-dataset?resource=download)) was included to improve the model's ability to detect the orientation of images containing text. (However over 1300 images needed have the orientation manually corrected like 0007a5a18213563f.jpg)
 - **Personal Images:** A small, curated collection of personal photographs to include unique examples and edge cases.
 
-The combined dataset consists of **45,726** unique images. Each image is augmented by being rotated in four ways (0°, 90°, 180°, 270°), creating a total of **182,904** samples. This augmented dataset was then split into **146,323 samples for training** and **36,581 samples for validation**.
+The combined dataset consists of **70,732** unique images. Each image is augmented by being rotated in four ways (0°, 90°, 180°, 270°), creating a total of **282,928** samples. This augmented dataset was then split into **226,342 samples for training** and **56,586 samples for validation**.
 
 ## Project Structure
 
@@ -114,22 +118,45 @@ To predict image orientation using the ONNX model:
 
 #### ONNX GPU Acceleration (Optional)
 
-For even better performance on NVIDIA GPUs, you can install the GPU-enabled version of ONNX Runtime.
+To significantly speed up predictions, you can install a hardware-accelerated version of ONNX Runtime. The script will automatically detect and use the best available option.
+
+First, uninstall the basic CPU package to avoid conflicts:
 
 ```bash
+pip uninstall onnxruntime
+```
+
+Then, install the package corresponding to your hardware:
+
+#### For NVIDIA GPUs (CUDA)
+
+```bash
+# Requires NVIDIA CUDA Toolkit & cuDNN
 pip install onnxruntime-gpu
 ```
 
-Make sure you have a compatible CUDA toolkit installed on your system. The `predict_onnx.py` script will automatically try to use the CUDA provider if it's available.
+#### For Apple Silicon (M1/M2/M3)
+
+```bash
+# Uses Apple's Metal Performance Shaders (MPS)
+pip install onnxruntime-silicon
+```
+
+#### For AMD GPUs (ROCm) - Untested
+
+```bash
+# Requires AMD ROCm driver/libraries
+pip install onnxruntime-rocm
+```
+
+The `predict_onnx.py` script will automatically try to use the best provider if it's available.
 
 #### Performance Comparison (PyTorch vs. ONNX)
 
-For a dataset of 5055 images, the performance on a RTX 4080 running in **single-thread** was:
+For a dataset of non-compressed 5055 images, the performance on a RTX 4080 running in **single-thread** was:
 
 - **PyTorch (`predict.py`):** 135.71 seconds
 - **ONNX (`predict_onnx.py`):** 60.83 seconds
-
-This demonstrates a significant performance gain of approximately **55.2%** when using the ONNX model for inference.
 
 ### Training
 

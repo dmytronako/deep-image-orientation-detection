@@ -3,7 +3,7 @@ import logging
 import sys
 import torchvision.transforms as transforms
 from config import IMAGE_SIZE
-from PIL import Image
+from PIL import Image, ImageOps
 
 def setup_logging():
     """Configures the logging for the application."""
@@ -60,28 +60,31 @@ def get_data_transforms() -> dict:
 
 def load_image_safely(path: str) -> Image.Image:
     """
-    Loads an image, safely converting it to a 3-channel RGB format.
-    It handles palletized images, and images with transparency by
-    compositing them onto a white background. This is the most robust
-    way to prevent processing errors and UserWarnings from Pillow.
+    Loads an image, respects EXIF orientation, and safely converts it to a
+    3-channel RGB format. It handles palletized images and images with
+    transparency by compositing them onto a white background. This is the
+    most robust way to prevent processing errors.
     """
     # 1. Open the image
     img = Image.open(path)
 
-    # 2. If the image is already in a simple mode that can be directly
+    # 2. Respect the EXIF orientation tag before any other processing.
+    img = ImageOps.exif_transpose(img)
+
+    # 3. If the image is already in a simple mode that can be directly
     #    converted to RGB, do it and return.
     if img.mode in ('RGB', 'L'): # L is grayscale
         return img.convert('RGB')
 
-    # 3. For all other modes (including P, PA, RGBA, etc.), convert to RGBA
+    # 4. For all other modes (including P, PA, RGBA, etc.), convert to RGBA
     #    first. This is the crucial step that standardizes the image
     #    and correctly handles transparency.
     rgba_img = img.convert('RGBA')
 
-    # 4. Create a new white background image in RGB mode.
+    # 5. Create a new white background image in RGB mode.
     background = Image.new("RGB", rgba_img.size, (255, 255, 255))
 
-    # 5. Paste the RGBA image onto the white background. The `rgba_img`
+    # 6. Paste the RGBA image onto the white background. The `rgba_img`
     #    itself is used as the mask, which tells Pillow to use its alpha channel.
     background.paste(rgba_img, mask=rgba_img)
 

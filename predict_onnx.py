@@ -62,13 +62,51 @@ def run_prediction_onnx(args):
         T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
     ])
 
-    # Load the ONNX model, explicitly trying to use CUDA
+    # Define a priority list for execution providers.
+    # ONNX Runtime will try to use the first one in this list that is available on the system.
+    PREFERRED_PROVIDERS = [
+        #'TensorrtExecutionProvider',  # For NVIDIA GPUs with TensorRT (commenting out for now)
+        'CUDAExecutionProvider',      # For NVIDIA GPUs
+        'MpsExecutionProvider',       # For Apple Silicon (M1/M2/M3) GPUs
+        'ROCmExecutionProvider',      # For AMD GPUs
+        'CoreMLExecutionProvider',    # For Apple devices (can use Neural Engine)
+        'CPUExecutionProvider'        # Universal fallback
+    ]
+
     try:
-        providers = ["CUDAExecutionProvider", "CPUExecutionProvider"] # Prioritize CUDA
-        ort_session = onnxruntime.InferenceSession(args.model_path, providers=providers)
-        logging.info(f"ONNX model loaded from {args.model_path} with providers: {ort_session.get_providers()}")
+        available_providers = onnxruntime.get_available_providers()
+        logging.info(f"Available ONNX Runtime providers: {available_providers}")
+
+        chosen_provider = None
+        for provider in PREFERRED_PROVIDERS:
+            if provider in available_providers:
+                chosen_provider = provider
+                break
+        
+        if not chosen_provider:
+            logging.warning(
+                "No preferred provider found. Defaulting to CPUExecutionProvider. "
+                "This should not happen as CPUExecutionProvider is always available."
+            )
+            chosen_provider = 'CPUExecutionProvider'
+
+        logging.info(f"Attempting to load ONNX model with provider: {chosen_provider}")
+        
+        # Load the ONNX model with the single, highest-priority available provider
+        ort_session = onnxruntime.InferenceSession(args.model_path, providers=[chosen_provider])
+        
+        actual_provider = ort_session.get_providers()[0]
+        logging.info(f"Successfully loaded ONNX model from {args.model_path} using provider: {actual_provider}")
+        
+        if chosen_provider != actual_provider and actual_provider == 'CPUExecutionProvider':
+             logging.warning(f"Warning: ONNX Runtime fell back to CPU. The chosen provider '{chosen_provider}' might not be correctly configured.")
+
     except Exception as e:
         logging.error(f"Error loading ONNX model {args.model_path}: {e}")
+        logging.error(
+            "If you are trying to use a GPU provider (CUDA, TensorRT, ROCm, MPS), "
+            "please ensure the correct onnxruntime package is installed and drivers are up to date."
+        )
         return
 
     input_path = args.input_path

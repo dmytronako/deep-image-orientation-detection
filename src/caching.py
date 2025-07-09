@@ -1,26 +1,29 @@
 import os
 import logging
-from PIL import Image
+from PIL import Image, ImageOps
 from tqdm import tqdm
 from multiprocessing import Pool, cpu_count
 import config
 
 def robust_open_image(path: str) -> Image.Image:
     """
-    Safely opens an image and converts it to a 3-channel RGB format.
-    This handles palletized images and images with transparency by
-    compositing them onto a white background.
+    Safely opens an image, respects EXIF orientation, and converts it to a
+    3-channel RGB format. It handles palletized images and images with
+    transparency by compositing them onto a white background.
     """
-    img = Image.open(path)
-    if img.mode in ('RGB', 'L'):
-        return img.convert('RGB')
-    
-    # For all other modes (P, PA, RGBA, etc.), convert to RGBA first.
-    # This correctly handles transparency.
-    rgba_img = img.convert('RGBA')
-    background = Image.new("RGB", rgba_img.size, (255, 255, 255))
-    background.paste(rgba_img, mask=rgba_img)
-    return background
+    with Image.open(path) as img:
+        # Respect the EXIF orientation tag before any other processing.
+        oriented_img = ImageOps.exif_transpose(img)
+
+        if oriented_img.mode in ('RGB', 'L'):
+            return oriented_img.convert('RGB')
+
+        # For all other modes (P, PA, RGBA, etc.), convert to RGBA first.
+        # This correctly handles transparency.
+        rgba_img = oriented_img.convert('RGBA')
+        background = Image.new("RGB", rgba_img.size, (255, 255, 255))
+        background.paste(rgba_img, mask=rgba_img)
+        return background
 
 def process_and_cache_image(image_path: str):
     """
@@ -32,12 +35,12 @@ def process_and_cache_image(image_path: str):
         rotations = {0: 0, 1: -90, 2: -180, 3: 90}
         original_filename = os.path.splitext(os.path.basename(image_path))[0]
         
-        with robust_open_image(image_path) as img:
-            for label, angle in rotations.items():
-                rotated_img = img.rotate(angle, resample=Image.BICUBIC, expand=True)
-                cached_filename = f"{original_filename}__{label}.png"
-                save_path = os.path.join(cache_dir, cached_filename)
-                rotated_img.save(save_path, "PNG")
+        img = robust_open_image(image_path)
+        for label, angle in rotations.items():
+            rotated_img = img.rotate(angle, resample=Image.BICUBIC, expand=True)
+            cached_filename = f"{original_filename}__{label}.png"
+            save_path = os.path.join(cache_dir, cached_filename)
+            rotated_img.save(save_path, "PNG")
         
         return None
 
