@@ -1,5 +1,5 @@
 # Image Orientation Detector
-<a href="https://huggingface.co/spaces/DuarteBarbosa/deep-image-orientation-detection" target="_blank" style="margin: 2px;">
+<a href="https://huggingface.co/DuarteBarbosa/deep-image-orientation-detection" target="_blank" style="margin: 2px;">
     <img alt="Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue" style="display: inline-block; vertical-align: middle;"/>
 </a>
 
