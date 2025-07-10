@@ -5,15 +5,15 @@ import torchvision.transforms as transforms
 from config import IMAGE_SIZE
 from PIL import Image, ImageOps
 
+
 def setup_logging():
     """Configures the logging for the application."""
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s [%(levelname)s] %(message)s",
-        handlers=[
-            logging.StreamHandler(sys.stdout)
-        ]
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
+
 
 def get_device() -> torch.device:
     """
@@ -30,33 +30,45 @@ def get_device() -> torch.device:
         logging.info("CUDA and MPS not available. Using CPU.")
     return device
 
+
 def get_data_transforms() -> dict:
     """
     Returns a dictionary of data transformations for training and validation.
     """
     return {
-        'train': transforms.Compose([
-            # Increase the range of cropping
-            transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)), 
-            transforms.RandomHorizontalFlip(),
-            # Increase the intensity of color jitter
-            transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
-            # Increase the rotation slightly
-            transforms.RandomRotation(15), 
-            # Random Erasing
-            transforms.ToTensor(), # ToTensor must come before Normalize and Erasing
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-            # Randomly erase a patch of the image, to make the model look at context
-            transforms.RandomErasing(p=0.5, scale=(0.02, 0.2)),
-        ]),
-        'val': transforms.Compose([
-            # The validation transform remains deterministic.
-            transforms.Resize((IMAGE_SIZE + 32, IMAGE_SIZE + 32)),
-            transforms.CenterCrop(IMAGE_SIZE),
-            transforms.ToTensor(),
-            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
-        ]),
+        "train": transforms.Compose(
+            [
+                # Increase the range of cropping
+                transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
+                transforms.RandomHorizontalFlip(),
+                # Increase the intensity of color jitter
+                transforms.ColorJitter(
+                    brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1
+                ),
+                # Increase the rotation slightly
+                transforms.RandomRotation(15),
+                # Random Erasing
+                transforms.ToTensor(),  # ToTensor must come before Normalize and Erasing
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+                # Randomly erase a patch of the image, to make the model look at context
+                transforms.RandomErasing(p=0.5, scale=(0.02, 0.2)),
+            ]
+        ),
+        "val": transforms.Compose(
+            [
+                # The validation transform remains deterministic.
+                transforms.Resize((IMAGE_SIZE + 32, IMAGE_SIZE + 32)),
+                transforms.CenterCrop(IMAGE_SIZE),
+                transforms.ToTensor(),
+                transforms.Normalize(
+                    mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
+                ),
+            ]
+        ),
     }
+
 
 def load_image_safely(path: str) -> Image.Image:
     """
@@ -73,13 +85,13 @@ def load_image_safely(path: str) -> Image.Image:
 
     # 3. If the image is already in a simple mode that can be directly
     #    converted to RGB, do it and return.
-    if img.mode in ('RGB', 'L'): # L is grayscale
-        return img.convert('RGB')
+    if img.mode in ("RGB", "L"):  # L is grayscale
+        return img.convert("RGB")
 
     # 4. For all other modes (including P, PA, RGBA, etc.), convert to RGBA
     #    first. This is the crucial step that standardizes the image
     #    and correctly handles transparency.
-    rgba_img = img.convert('RGBA')
+    rgba_img = img.convert("RGBA")
 
     # 5. Create a new white background image in RGB mode.
     background = Image.new("RGB", rgba_img.size, (255, 255, 255))
