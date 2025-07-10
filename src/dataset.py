@@ -24,7 +24,8 @@ class ImageOrientationDataset(Dataset):
             raise ValueError(f"No images found in the directory: {upright_dir}")
 
         self.transform = transform
-        self.rotations = [0, 90, 180, 270] # PIL rotation degrees
+        # Use the rotation definition from config
+        self.rotations = config.ROTATIONS
         self.num_rotations = len(self.rotations)
 
     def __len__(self):
@@ -32,11 +33,10 @@ class ImageOrientationDataset(Dataset):
 
     def __getitem__(self, idx):
         image_idx = idx // self.num_rotations
-        rotation_idx = idx % self.num_rotations
+        label = idx % self.num_rotations
         
         image_path = self.image_files[image_idx]
-        angle_to_rotate = self.rotations[rotation_idx]
-        label = rotation_idx
+        angle_to_rotate = self.rotations[label]
 
         try:
             # Use the safe loader from utils

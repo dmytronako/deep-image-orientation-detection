@@ -1,7 +1,8 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.utils.data import DataLoader, random_split
+from torch.utils.data import DataLoader, random_split, Subset
+from copy import deepcopy
 import os
 import argparse
 import logging
@@ -80,13 +81,21 @@ def train(args):
         logging.error(f"Failed to initialize dataset: {e}")
         return
 
-    # Split the dataset
+    # Create a dedicated validation set with its own transform
+    val_dataset = deepcopy(full_dataset)
+    val_dataset.transform = data_transforms['val']
+    
+    # The original dataset will be used for training, with augmentations
+    full_dataset.transform = data_transforms['train']
+    
+    # Split the original dataset (now with training transforms)
     train_size = int(0.8 * len(full_dataset))
     val_size = len(full_dataset) - train_size
-    train_subset, val_subset = random_split(full_dataset, [train_size, val_size])
-
-    train_subset.dataset.transform = data_transforms['train']
-    val_subset.dataset.transform = data_transforms['val']
+    
+    # Split the original dataset and then replace the validation subset
+    # with one that points to our clean, non-augmented val_dataset.
+    train_subset, _ = random_split(full_dataset, [train_size, val_size])
+    _ , val_subset = random_split(val_dataset, [train_size, val_size])
 
     if config.USE_CACHE:
         logging.info(f"Total cached dataset size: {len(full_dataset)}")
@@ -230,10 +239,19 @@ def train(args):
             best_val_acc = current_acc
             epochs_no_improve = 0 # Reset counter
             
-            # Save the best model state_dict
-            best_model_path = os.path.join(args.model_dir, "best_model.pth")
-            torch.save(original_model.state_dict(), best_model_path)
-            logging.info(f"   New best model saved! Val Acc: {best_val_acc:.4f}")            
+            # --- Save the best model with two naming conventions ---
+            # 1. A static name for easy reference in prediction scripts
+            static_save_path = os.path.join(args.model_dir, "best_model.pth")
+            torch.save(original_model.state_dict(), static_save_path)
+
+            # 2. A versioned name including the model name and accuracy
+            versioned_model_name = f"{config.MODEL_NAME}_{best_val_acc:.4f}.pth"
+            versioned_save_path = os.path.join(args.model_dir, versioned_model_name)
+            torch.save(original_model.state_dict(), versioned_save_path)
+
+            logging.info(f"   New best model saved! Val Acc: {best_val_acc:.4f}")
+            logging.info(f"   Model saved as '{static_save_path}' and '{versioned_save_path}'")
+            
         else:
             epochs_no_improve += 1
 
@@ -265,8 +283,9 @@ def train(args):
     logging.info("=================================================")
     logging.info(f"Total Training Time: {total_duration:.2f} seconds ({total_minutes:.2f} minutes)")
     if os.path.exists(os.path.join(args.model_dir, "best_model.pth")):
+        final_model_name = f"{config.MODEL_NAME}_{best_val_acc:.4f}.pth"
         logging.info(f"Best Validation Accuracy: {best_val_acc:.4f}")
-        logging.info(f"Final best model saved as: best_model.pth")
+        logging.info(f"Final best model saved as 'best_model.pth' and '{final_model_name}'")
     else:
         logging.warning("No model was saved as validation accuracy did not improve from its initial state.")
     logging.info("=================================================")

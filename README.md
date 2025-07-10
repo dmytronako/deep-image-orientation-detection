@@ -1,4 +1,5 @@
 # Image Orientation Detector
+
 <a href="https://huggingface.co/DuarteBarbosa/deep-image-orientation-detection" target="_blank" style="margin: 2px;">
     <img alt="Hugging Face" src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-Model-blue" style="display: inline-block; vertical-align: middle;"/>
 </a>
@@ -24,9 +25,9 @@ The model is trained on a dataset of images, where each image is rotated by 0°,
 The four classes correspond to the following rotations:
 
 - **Class 0:** Image is correctly oriented (0°).
-- **Class 1:** Image needs to be rotated 90° Counter-Clockwise to be correct.
-- **Class 2:** Image needs to be rotated 180° to be correct.
-- **Class 3:** Image needs to be rotated 90° Clockwise to be correct.
+- **Class 1:** Image needs to be rotated **90° Clockwise** to be correct.
+- **Class 2:** Image needs to be rotated **180°** to be correct.
+- **Class 3:** Image needs to be rotated **90° Counter-Clockwise** to be correct.
 
 ## Dataset
 
@@ -182,13 +183,13 @@ Key configuration options in `config.py`:
 
 - **Paths and Caching**:
 
-  - `TRAIN_IMAGES_PATH`: Path to upright images. Defaults to `data/upright_images`.
-  - `CACHE_PATH`: Directory where rotated images will be cached. Defaults to `data/cache`.
+  - `DATA_DIR`: Path to upright images. Defaults to `data/upright_images`.
+  - `CACHE_DIR`: Directory where rotated images will be cached. Defaults to `data/cache`.
   - `USE_CACHE`: Set to `True` to use the cache on subsequent runs, significantly speeding up data loading but takes a lot of disk space.
 - **Model and Training Hyperparameters**:
 
-  - `MODEL_NAME`: The name of the model architecture to use (e.g., `EfficientNetV2S`).
-  - `IMAGE_SIZE`: The resolution to which images will be resized (e.g., `224` for 224x224 pixels).
+  - `MODEL_NAME`: The base name for the model, used for saving versioned files (e.g., `orientation_model_v3`).
+  - `IMAGE_SIZE`: The resolution to which images will be resized (e.g., `384` for 384x384 pixels).
   - `BATCH_SIZE`: Number of images to process in each batch. Adjust based on GPU's VRAM.
   - `NUM_EPOCHS`: The total number of times the model will iterate over the entire dataset.
   - `LEARNING_RATE`: The initial learning rate for the optimizer.
@@ -204,6 +205,9 @@ python train.py
 - **First Run**: The first time the script runs, it will preprocess and cache the dataset. This may take a while depending on the size of the dataset.
 - **Subsequent Runs**: Later runs will be much faster as they will use the cached data.
 - **Monitoring**: Use TensorBoard to monitor training progress by running `tensorboard --logdir=runs`.
+- **Model Saving**: When a new best model is found, it is saved twice in the `models/` directory:
+  - `best_model.pth`: A static filename that always points to the latest best model. This is used by default for prediction.
+  - `<MODEL_NAME>_<accuracy>.pth` (e.g., `orientation_model_v3_0.9812.pth`): A versioned filename to keep a record of high-performing models.
 
 ### Monitoring with TensorBoard
 

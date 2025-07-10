@@ -37,7 +37,7 @@ def get_data_transforms() -> dict:
     return {
         'train': transforms.Compose([
             # Increase the range of cropping
-            transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.7, 1.0)), 
+            transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)), 
             transforms.RandomHorizontalFlip(),
             # Increase the intensity of color jitter
             transforms.ColorJitter(brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1),
