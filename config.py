@@ -4,8 +4,8 @@ CACHE_DIR = "data/cache"
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"
 IMAGE_SIZE = 384
-BATCH_SIZE = 128
-NUM_WORKERS = 4 # Or More, depending on your CPU cores
+BATCH_SIZE = 128 # Or More (eg. 512), depending on your GPU memory
+NUM_WORKERS = 4 # Or More (eg. 16), depending on your CPU cores
 
 # --- Model Configuration ---
 MODEL_SAVE_DIR = "models"
