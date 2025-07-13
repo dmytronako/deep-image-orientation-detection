@@ -38,27 +38,23 @@ def get_data_transforms() -> dict:
     return {
         "train": transforms.Compose(
             [
-                # Increase the range of cropping
-                transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.8, 1.0)),
-                transforms.RandomHorizontalFlip(),
-                # Increase the intensity of color jitter
+                # Use a crop that preserves more of the image center
+                transforms.RandomResizedCrop(IMAGE_SIZE, scale=(0.85, 1.0)),
+                # ColorJitter is a good augmentation that doesn't affect orientation
                 transforms.ColorJitter(
-                    brightness=0.3, contrast=0.3, saturation=0.3, hue=0.1
+                    brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
                 ),
-                # Increase the rotation slightly
-                transforms.RandomRotation(15),
-                # Random Erasing
-                transforms.ToTensor(),  # ToTensor must come before Normalize and Erasing
+                # RandomErasing is also a good regularizer
+                transforms.ToTensor(),
                 transforms.Normalize(
                     mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]
                 ),
-                # Randomly erase a patch of the image, to make the model look at context
-                transforms.RandomErasing(p=0.5, scale=(0.02, 0.2)),
+                transforms.RandomErasing(p=0.25, scale=(0.02, 0.1)),
             ]
         ),
         "val": transforms.Compose(
             [
-                # The validation transform remains deterministic.
+                # Validation transform is fine as is
                 transforms.Resize((IMAGE_SIZE + 32, IMAGE_SIZE + 32)),
                 transforms.CenterCrop(IMAGE_SIZE),
                 transforms.ToTensor(),
