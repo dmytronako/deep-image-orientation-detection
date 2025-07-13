@@ -6,17 +6,11 @@
 
 This project implements a deep learning model to detect the orientation of images and determine the rotation needed to correct them. It uses a pre-trained EfficientNetV2 model from PyTorch, fine-tuned for the task of classifying images into four orientation categories: 0°, 90°, 180°, and 270°.
 
-The model achieves **98.12% accuracy** on the validation set.
+The model achieves **98.82% accuracy** on the validation set.
 
-## Training Performance and Model History
+## Training Performance
 
-This model was trained on a single NVIDIA RTX 4080 GPU, taking approximately **4 hours and 56.4 minutes** to complete.
-
-The final model is using `EfficientNetV2-S`, but the project evolved through several iterations:
-
-- **ResNet18:** Achieved ~90% accuracy with a model size of around 30MB.
-- **ResNet50:** Improved accuracy to 95.26% with a model size of ~100MB.
-- **EfficientNetV2-S:** Reached the "final" (for now) accuracy of **98.12%** with ~78MB.
+This model was trained on a single NVIDIA H100 GPU, taking **5 hours, 5 minutes and 37 seconds** to complete.
 
 ## How It Works
 
@@ -38,7 +32,7 @@ The model was trained on several datasets:
 - **TextOCR - Text Extraction from Images Dataset:** A dataset from Kaggle ([link](https://www.kaggle.com/datasets/robikscube/textocr-text-extraction-from-images-dataset?resource=download)) was included to improve the model's ability to detect the orientation of images containing text. (However over 1300 images needed have the orientation manually corrected like 0007a5a18213563f.jpg)
 - **Personal Images:** A small, curated collection of personal photographs to include unique examples and edge cases.
 
-The combined dataset consists of **70,732** unique images. Each image is augmented by being rotated in four ways (0°, 90°, 180°, 270°), creating a total of **282,928** samples. This augmented dataset was then split into **226,342 samples for training** and **56,586 samples for validation**.
+The model was trained on a huge dataset of **189,018** unique images. Each image is augmented by being rotated in four ways (0°, 90°, 180°, 270°), creating a total of **756,072** samples. This augmented dataset was then split into **604,857 samples for training** and **151,215 samples for validation**.
 
 ## Project Structure
 
