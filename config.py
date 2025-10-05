@@ -4,12 +4,12 @@ CACHE_DIR = "data/cache"
 # --- Dataloader and Preprocessing ---
 DATA_DIR = "data/upright_images"
 IMAGE_SIZE = 384
-BATCH_SIZE = 512  # Or More (eg. 512), depending on your GPU memory
-NUM_WORKERS = 16  # Or More (eg. 16), depending on your CPU cores
+BATCH_SIZE = 64  # Or More (eg. 512), depending on your GPU memory
+NUM_WORKERS = 2  # Or More (eg. 16), depending on your CPU cores
 
 # --- Model Configuration ---
 MODEL_SAVE_DIR = "models"
-MODEL_NAME = "orientation_model_v7"
+MODEL_NAME = "orientation_model_tuned"
 NUM_CLASSES = 4  # 0°, 90°, 180°, 270°
 
 # The model is trained to predict the rotation that was APPLIED to an upright image.
@@ -17,8 +17,9 @@ NUM_CLASSES = 4  # 0°, 90°, 180°, 270°
 ROTATIONS = {0: 0, 1: 90, 2: 180, 3: 270}
 
 # --- Training Hyperparameters ---
-LEARNING_RATE = 0.0001
-NUM_EPOCHS = 25
+LEARNING_RATE = 0.00007 # Reduce learning rate to 7e-5
+NUM_EPOCHS = 5 # Reduce num of epochs from 25 to 8
+# With batch size 64 it goes 5 * (7000 * 4) / 64 or around 2000 iterations
 
 # --- Prediction Settings ---
 # A dictionary to map class indices to the corrective action.
